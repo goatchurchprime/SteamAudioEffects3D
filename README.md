@@ -9,3 +9,5 @@ but I could strip out this dependency and make it put its effects on an AudioBus
 To check for errors in the conversion of these complex C++ functions, the measurement 
 of the output spectrum from a simple sinewave tone is plotted.
 
+
+<img width="891" height="493" alt="image" src="https://github.com/user-attachments/assets/ead05add-fa9a-4a41-9eda-9927577cbeef" />
