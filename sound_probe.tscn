@@ -1,0 +1,29 @@
+[gd_scene format=3 uid="uid://dmw81fn40ksfv"]
+
+[ext_resource type="Script" uid="uid://cot7finklbbv8" path="res://sound_probe.gd" id="1_75rg3"]
+
+[node name="SoundProbe" type="Node2D" unique_id=1997166620]
+script = ExtResource("1_75rg3")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=115560147]
+custom_minimum_size = Vector2(800, 200)
+offset_right = 40.0
+offset_bottom = 40.0
+color = Color(0, 0.33414555, 0.33414555, 0.38431373)
+
+[node name="Line2D_left" type="Line2D" parent="." unique_id=278529242]
+points = PackedVector2Array(0, 0, 18, -3, 39, -16, 117, 11)
+width = 2.0
+default_color = Color(1, 1, 0.52156866, 1)
+
+[node name="Line2D_right" type="Line2D" parent="." unique_id=66692861]
+points = PackedVector2Array(0, 0, 18, -3, 39, -16, 117, 11)
+width = 2.0
+
+[node name="Label" type="Label" parent="." unique_id=1468725913]
+offset_left = 667.0
+offset_top = 175.0
+offset_right = 798.0
+offset_bottom = 198.0
+text = "Label
+"

@@ -1,0 +1,125 @@
+[gd_scene format=3 uid="uid://br23ps4a7qoi1"]
+
+[ext_resource type="Script" uid="uid://cxkjditufkuri" path="res://main.gd" id="1_0xm2m"]
+[ext_resource type="AudioStream" uid="uid://dl7rlkr1vkqc" path="res://tone330.wav" id="3_1bvp3"]
+[ext_resource type="Script" uid="uid://1mrjobi82rxx" path="res://audio_stream_player_effects3d.gd" id="3_h2yge"]
+[ext_resource type="PackedScene" uid="uid://dmw81fn40ksfv" path="res://sound_probe.tscn" id="4_lquwl"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_m1hyp"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_m1hyp"]
+bottom_radius = 0.1
+
+[sub_resource type="AudioEffectHighShelfFilter" id="AudioEffectHighShelfFilter_1bvp3"]
+resonance = 1.0
+
+[sub_resource type="AudioEffectAmplify" id="AudioEffectAmplify_m1hyp"]
+
+[sub_resource type="AudioEffectPanner" id="AudioEffectPanner_phl0j"]
+pan = -1.0
+
+[sub_resource type="AudioStreamWithEffects" id="AudioStreamWithEffects_0xm2m"]
+stream = ExtResource("3_1bvp3")
+effect_count = 3
+effect_0/effect = SubResource("AudioEffectHighShelfFilter_1bvp3")
+effect_1/effect = SubResource("AudioEffectAmplify_m1hyp")
+effect_2/effect = SubResource("AudioEffectPanner_phl0j")
+
+[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_lquwl"]
+mix_rate = 8000.0
+
+[node name="Main" type="Node3D" unique_id=1197520070]
+script = ExtResource("1_0xm2m")
+
+[node name="AudioListener3D" type="AudioListener3D" parent="." unique_id=490519390]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="AudioListener3D" unique_id=1105475790]
+mesh = SubResource("BoxMesh_m1hyp")
+
+[node name="AudioNode" type="Node3D" parent="." unique_id=975124444]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 0, 0)
+
+[node name="AudioPosition" type="Node3D" parent="AudioNode" unique_id=1998161151]
+transform = Transform3D(-4.3711385e-08, 0, 0.99999994, 0, 1, 0, -0.99999994, 0, -4.3711385e-08, 2.209, 0, 0)
+
+[node name="AudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="AudioNode/AudioPosition" unique_id=856729324]
+transform = Transform3D(1.0000001, 0, 0, 0, 1, 0, 0, 0, 1.0000001, 0, 0, 0)
+stream = ExtResource("3_1bvp3")
+max_distance = 22.0
+bus = &"BusServer3D"
+emission_angle_enabled = true
+emission_angle_degrees = 35.0
+emission_angle_filter_attenuation_db = -22.0
+attenuation_filter_cutoff_hz = 2000.0
+
+[node name="ShowAudioCone" type="MeshInstance3D" parent="AudioNode/AudioPosition/AudioStreamPlayer3D" unique_id=1041085940]
+transform = Transform3D(0.9999999, 0, 0, 0, -4.371139e-08, 1.0000001, 0, -0.9999999, -4.371139e-08, 0, 0, 0)
+mesh = SubResource("CylinderMesh_m1hyp")
+
+[node name="AudioStreamEffect3D" type="Node3D" parent="AudioNode/AudioPosition/AudioStreamPlayer3D" unique_id=420692142]
+script = ExtResource("3_h2yge")
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D" unique_id=1636531096]
+stream = SubResource("AudioStreamWithEffects_0xm2m")
+max_polyphony = 5
+bus = &"BusEffect3D"
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=106336885]
+transform = Transform3D(1, 0, 0, 0, 0.01457683, 0.9998938, 0, -0.9998938, 0.01457683, 0, 4.711708, 0)
+
+[node name="Control" type="Control" parent="." unique_id=1212749891]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="HBox" type="HBoxContainer" parent="Control" unique_id=1372926417]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="SpinSource" type="CheckButton" parent="Control/HBox" unique_id=543335002]
+layout_mode = 2
+text = "SpinSource"
+
+[node name="RotateSource" type="CheckButton" parent="Control/HBox" unique_id=1780057596]
+layout_mode = 2
+text = "Rotate Source"
+
+[node name="SwingSource" type="CheckButton" parent="Control/HBox" unique_id=1219744532]
+layout_mode = 2
+text = "SwingSource"
+
+[node name="AttenuationSource" type="CheckButton" parent="Control/HBox" unique_id=694642607]
+layout_mode = 2
+text = "Attenuate Source"
+
+[node name="SlowerMotion" type="CheckButton" parent="Control/HBox" unique_id=775655120]
+layout_mode = 2
+text = "Slower Motion
+"
+
+[node name="PlayButton" type="Button" parent="Control/HBox" unique_id=193923772]
+layout_mode = 2
+text = "Play"
+
+[node name="Display" type="Node2D" parent="." unique_id=997318706]
+position = Vector2(21, 173)
+
+[node name="SoundProbe3D" parent="Display" unique_id=1997166620 instance=ExtResource("4_lquwl")]
+position = Vector2(-4, -110)
+
+[node name="SoundProbeEffect" parent="Display" unique_id=1357477214 instance=ExtResource("4_lquwl")]
+position = Vector2(-1, 104)
+
+[node name="Line2D_Zero" type="Line2D" parent="Display" unique_id=202469329]
+position = Vector2(4, -112)
+points = PackedVector2Array(0, 0, 800, 0)
+width = 1.0
+default_color = Color(1, 0.05490196, 0.050980393, 1)
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=2143132224]
+stream = SubResource("AudioStreamGenerator_lquwl")
+bus = &"BusServer3D"
+
+[connection signal="pressed" from="Control/HBox/PlayButton" to="." method="_on_play_button_pressed"]
