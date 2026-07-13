@@ -15,3 +15,7 @@ func _physics_process(delta):
 func _on_play_button_pressed():
 	$Display/SoundProbe3D.setstreamplayer($AudioNode/AudioPosition/AudioStreamPlayer3D)
 	$Display/SoundProbeEffect.setstreamplayer($AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D/AudioStreamPlayer)
+
+
+func _on_polyphony_test_pressed():
+	$AudioStreamPlayer.play()

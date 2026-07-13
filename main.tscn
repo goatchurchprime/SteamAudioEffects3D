@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://br23ps4a7qoi1"]
 
 [ext_resource type="Script" uid="uid://cxkjditufkuri" path="res://main.gd" id="1_0xm2m"]
+[ext_resource type="AudioStream" uid="uid://s2anpxqwdphb" path="res://cop_siren.wav" id="1_ig7tw"]
 [ext_resource type="AudioStream" uid="uid://dl7rlkr1vkqc" path="res://tone330.wav" id="3_1bvp3"]
 [ext_resource type="Script" uid="uid://1mrjobi82rxx" path="res://audio_stream_player_effects3d.gd" id="3_h2yge"]
 [ext_resource type="PackedScene" uid="uid://dmw81fn40ksfv" path="res://sound_probe.tscn" id="4_lquwl"]
@@ -25,8 +26,8 @@ effect_0/effect = SubResource("AudioEffectHighShelfFilter_1bvp3")
 effect_1/effect = SubResource("AudioEffectAmplify_m1hyp")
 effect_2/effect = SubResource("AudioEffectPanner_phl0j")
 
-[sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_lquwl"]
-mix_rate = 8000.0
+[sub_resource type="AudioStreamWithEffects" id="AudioStreamWithEffects_lquwl"]
+stream = ExtResource("1_ig7tw")
 
 [node name="Main" type="Node3D" unique_id=1197520070]
 script = ExtResource("1_0xm2m")
@@ -103,6 +104,14 @@ text = "Slower Motion
 layout_mode = 2
 text = "Play"
 
+[node name="PolyphonyTest" type="Button" parent="Control" unique_id=402892154]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 498.0
+offset_right = 78.0
+offset_bottom = 543.0
+text = "Polyphony test"
+
 [node name="Display" type="Node2D" parent="." unique_id=997318706]
 position = Vector2(21, 173)
 
@@ -119,7 +128,9 @@ width = 1.0
 default_color = Color(1, 0.05490196, 0.050980393, 1)
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=2143132224]
-stream = SubResource("AudioStreamGenerator_lquwl")
+stream = SubResource("AudioStreamWithEffects_lquwl")
+max_polyphony = 5
 bus = &"BusServer3D"
 
 [connection signal="pressed" from="Control/HBox/PlayButton" to="." method="_on_play_button_pressed"]
+[connection signal="pressed" from="Control/PolyphonyTest" to="." method="_on_polyphony_test_pressed"]
