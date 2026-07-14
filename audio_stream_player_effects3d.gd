@@ -15,9 +15,13 @@ var cached_global_panning_strength = ProjectSettings.get_setting("audio/general/
 @export var emission_angle_enabled : bool = false
 @export var emission_angle_degrees = 45.0
 @export var emission_angle_filter_attenuation_db = -12.0
+@export var pitch_scale : float = 1.0
+@export var doppler_tracking : AudioStreamPlayer3D.DopplerTracking = AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED
 @export var bus : String = ""
 
 var playereffectbus : String
+
+# Doppler implementation made complicated due to removal of VelocityTracker3D: https://github.com/godotengine/godot/pull/64592
 
 # This could actually be done on a bus
 var effecthighshelffilter : AudioEffectHighShelfFilter
@@ -82,6 +86,12 @@ func _update_panning():
 	var audio_listener = get_viewport().get_audio_listener_3d()
 	var llistener_node = audio_listener if audio_listener else get_viewport().get_camera_3d()
 	var linear_attenuation = 0.0
+	
+	var actual_pitch_scale = pitch_scale;
+	var linear_velocity : Vector3
+	#if doppler_tracking != AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED:
+	#	linear_velocity = velocity_tracker->get_tracked_linear_velocity();
+		
 	for listener_node in [ llistener_node ]:
 		var local_pos = listener_node.global_transform.orthonormalized().affine_inverse() * global_pos
 		var dist = local_pos.length()
@@ -125,5 +135,7 @@ func _physics_process(delta):
 	emission_angle_enabled = ap.emission_angle_enabled
 	emission_angle_degrees = ap.emission_angle_degrees
 	emission_angle_filter_attenuation_db = ap.emission_angle_filter_attenuation_db
+	doppler_tracking = ap.doppler_tracking
+	pitch_scale = ap.pitch_scale
 
 	_update_panning()

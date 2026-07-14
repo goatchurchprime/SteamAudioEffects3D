@@ -34,6 +34,7 @@ emission_angle_enabled = true
 emission_angle_degrees = 35.0
 emission_angle_filter_attenuation_db = -22.0
 attenuation_filter_cutoff_hz = 2000.0
+doppler_tracking = 2
 
 [node name="ShowAudioCone" type="MeshInstance3D" parent="AudioNode/AudioPosition/AudioStreamPlayer3D" unique_id=1041085940]
 transform = Transform3D(0.9999999, 0, 0, 0, -4.371139e-08, 1.0000001, 0, -0.9999999, -4.371139e-08, 0, 0, 0)
@@ -41,6 +42,19 @@ mesh = SubResource("CylinderMesh_m1hyp")
 
 [node name="AudioStreamEffect3D" type="Node3D" parent="AudioNode/AudioPosition/AudioStreamPlayer3D" unique_id=420692142]
 script = ExtResource("3_h2yge")
+max_distance = null
+volume_db = null
+max_db = null
+unit_size = null
+attenuation_model = null
+attenuation_filter_db = null
+attenuation_filter_cutoff_hz = null
+emission_angle_enabled = null
+emission_angle_degrees = null
+emission_angle_filter_attenuation_db = null
+pitch_scale = null
+doppler_tracking = null
+bus = null
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D" unique_id=1636531096]
 stream = ExtResource("3_1bvp3")
@@ -63,19 +77,27 @@ offset_bottom = 40.0
 
 [node name="SpinSource" type="CheckButton" parent="Control/HBox" unique_id=543335002]
 layout_mode = 2
-text = "SpinSource"
+text = "Spin"
 
 [node name="RotateSource" type="CheckButton" parent="Control/HBox" unique_id=1780057596]
 layout_mode = 2
-text = "Rotate Source"
+text = "Rotate"
 
 [node name="SwingSource" type="CheckButton" parent="Control/HBox" unique_id=1219744532]
 layout_mode = 2
-text = "SwingSource"
+text = "Swing"
+
+[node name="BounceSource" type="CheckButton" parent="Control/HBox" unique_id=942962515]
+layout_mode = 2
+text = "BounceY"
 
 [node name="AttenuationSource" type="CheckButton" parent="Control/HBox" unique_id=694642607]
 layout_mode = 2
-text = "Attenuate Source"
+text = "Attenuate "
+
+[node name="Overlay" type="CheckButton" parent="Control/HBox" unique_id=1108337644]
+layout_mode = 2
+text = "Overlay "
 
 [node name="SlowerMotion" type="CheckButton" parent="Control/HBox" unique_id=775655120]
 layout_mode = 2
@@ -98,10 +120,8 @@ text = "Polyphony test"
 position = Vector2(21, 173)
 
 [node name="SoundProbe3D" parent="Display" unique_id=1997166620 instance=ExtResource("4_lquwl")]
-position = Vector2(-4, -110)
 
 [node name="SoundProbeEffect" parent="Display" unique_id=1357477214 instance=ExtResource("4_lquwl")]
-position = Vector2(-1, 104)
 
 [node name="Line2D_Zero" type="Line2D" parent="Display" unique_id=202469329]
 position = Vector2(4, -112)
