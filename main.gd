@@ -17,5 +17,11 @@ func _on_play_button_pressed():
 	$Display/SoundProbeEffect.setstreamplayer($AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D/AudioStreamPlayer)
 
 
+var s = 0
 func _on_polyphony_test_pressed():
+	var d : AudioEffectDelay = AudioServer.get_bus_effect(AudioServer.get_bus_index($AudioStreamPlayer.bus), 0)
 	$AudioStreamPlayer.play()
+	s += 1
+	d.tap1_delay_ms = 5 if ((s%4) < 2) else 0
+	d.tap2_delay_ms = 5 if (((s+1)%4) < 2) else 0
+	prints(d.tap1_delay_ms, d.tap2_delay_ms)

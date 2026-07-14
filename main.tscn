@@ -26,9 +26,6 @@ effect_0/effect = SubResource("AudioEffectHighShelfFilter_1bvp3")
 effect_1/effect = SubResource("AudioEffectAmplify_m1hyp")
 effect_2/effect = SubResource("AudioEffectPanner_phl0j")
 
-[sub_resource type="AudioStreamWithEffects" id="AudioStreamWithEffects_lquwl"]
-stream = ExtResource("1_ig7tw")
-
 [node name="Main" type="Node3D" unique_id=1197520070]
 script = ExtResource("1_0xm2m")
 
@@ -128,9 +125,8 @@ width = 1.0
 default_color = Color(1, 0.05490196, 0.050980393, 1)
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=2143132224]
-stream = SubResource("AudioStreamWithEffects_lquwl")
-max_polyphony = 5
-bus = &"BusServer3D"
+stream = ExtResource("1_ig7tw")
+bus = &"DelayExperiment"
 
 [connection signal="pressed" from="Control/HBox/PlayButton" to="." method="_on_play_button_pressed"]
 [connection signal="pressed" from="Control/PolyphonyTest" to="." method="_on_polyphony_test_pressed"]
