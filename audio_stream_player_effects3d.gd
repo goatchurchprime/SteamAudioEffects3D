@@ -15,17 +15,31 @@ var cached_global_panning_strength = ProjectSettings.get_setting("audio/general/
 @export var emission_angle_enabled : bool = false
 @export var emission_angle_degrees = 45.0
 @export var emission_angle_filter_attenuation_db = -12.0
+@export var bus : String = ""
 
+var playereffectbus : String
 
 # This could actually be done on a bus
 var effecthighshelffilter : AudioEffectHighShelfFilter
 var effectamplify : AudioEffectAmplify
 var effectpanner : AudioEffectPanner
 func _ready():
-	effecthighshelffilter = $AudioStreamPlayer.stream.get_effect(0)
-	effectamplify = $AudioStreamPlayer.stream.get_effect(1)
-	effectpanner = $AudioStreamPlayer.stream.get_effect(2)
+	if bus == "":
+		bus = $AudioStreamPlayer.bus
+	playereffectbus = "PlayerEffectBus_%d" % $AudioStreamPlayer.get_instance_id()
+	AudioServer.add_bus()
+	var bus_idx = AudioServer.bus_count - 1
+	assert (AudioServer.get_bus_effect_count(bus_idx) == 0)
+	AudioServer.set_bus_name(bus_idx, playereffectbus)
+	AudioServer.set_bus_send(bus_idx, bus)
+	$AudioStreamPlayer.bus = playereffectbus
+	effecthighshelffilter = AudioEffectHighShelfFilter.new()
 	effecthighshelffilter.resonance = 1.0
+	AudioServer.add_bus_effect(bus_idx, effecthighshelffilter)
+	effectamplify = AudioEffectAmplify.new()
+	AudioServer.add_bus_effect(bus_idx, effectamplify)
+	effectpanner = AudioEffectPanner.new()
+	AudioServer.add_bus_effect(bus_idx, effectpanner)
 
 func _get_attenuation_db(p_distance):
 	var att = 0

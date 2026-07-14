@@ -1,30 +1,15 @@
 [gd_scene format=3 uid="uid://br23ps4a7qoi1"]
 
 [ext_resource type="Script" uid="uid://cxkjditufkuri" path="res://main.gd" id="1_0xm2m"]
-[ext_resource type="AudioStream" uid="uid://s2anpxqwdphb" path="res://cop_siren.wav" id="1_ig7tw"]
 [ext_resource type="AudioStream" uid="uid://dl7rlkr1vkqc" path="res://tone330.wav" id="3_1bvp3"]
 [ext_resource type="Script" uid="uid://1mrjobi82rxx" path="res://audio_stream_player_effects3d.gd" id="3_h2yge"]
+[ext_resource type="AudioStream" uid="uid://cgc40uucq0g0d" path="res://audiocheck.net_pinknoise.wav" id="4_1bvp3"]
 [ext_resource type="PackedScene" uid="uid://dmw81fn40ksfv" path="res://sound_probe.tscn" id="4_lquwl"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_m1hyp"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_m1hyp"]
 bottom_radius = 0.1
-
-[sub_resource type="AudioEffectHighShelfFilter" id="AudioEffectHighShelfFilter_1bvp3"]
-resonance = 1.0
-
-[sub_resource type="AudioEffectAmplify" id="AudioEffectAmplify_m1hyp"]
-
-[sub_resource type="AudioEffectPanner" id="AudioEffectPanner_phl0j"]
-pan = -1.0
-
-[sub_resource type="AudioStreamWithEffects" id="AudioStreamWithEffects_0xm2m"]
-stream = ExtResource("3_1bvp3")
-effect_count = 3
-effect_0/effect = SubResource("AudioEffectHighShelfFilter_1bvp3")
-effect_1/effect = SubResource("AudioEffectAmplify_m1hyp")
-effect_2/effect = SubResource("AudioEffectPanner_phl0j")
 
 [node name="Main" type="Node3D" unique_id=1197520070]
 script = ExtResource("1_0xm2m")
@@ -58,7 +43,7 @@ mesh = SubResource("CylinderMesh_m1hyp")
 script = ExtResource("3_h2yge")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D" unique_id=1636531096]
-stream = SubResource("AudioStreamWithEffects_0xm2m")
+stream = ExtResource("3_1bvp3")
 max_polyphony = 5
 bus = &"BusEffect3D"
 
@@ -125,7 +110,9 @@ width = 1.0
 default_color = Color(1, 0.05490196, 0.050980393, 1)
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=2143132224]
-stream = ExtResource("1_ig7tw")
+stream = ExtResource("4_1bvp3")
+volume_db = 1.571
+pitch_scale = 0.26
 bus = &"DelayExperiment"
 
 [connection signal="pressed" from="Control/HBox/PlayButton" to="." method="_on_play_button_pressed"]

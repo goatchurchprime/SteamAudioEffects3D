@@ -6,11 +6,11 @@ var windowseconds = 12
 @onready var width = $ColorRect.size.x
 @onready var height = $ColorRect.size.y
 
-func setstreamplayer(lstreamplayer):
+func setstreamplayer(lstreamplayer, lbus):
 	streamplayer = lstreamplayer
 	streamplayer.play()
 	$Label.text = streamplayer.get_name()
-	var bi = AudioServer.get_bus_index(streamplayer.bus)
+	var bi = AudioServer.get_bus_index(lbus)
 	sai1 = AudioServer.get_bus_effect_instance(bi, 0)
 
 var t = 0

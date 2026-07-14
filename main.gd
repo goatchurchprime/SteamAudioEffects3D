@@ -13,8 +13,8 @@ func _physics_process(delta):
 	$AudioNode/AudioPosition/AudioStreamPlayer3D.attenuation_filter_db = -60 if $Control/HBox/AttenuationSource.button_pressed else 0
 
 func _on_play_button_pressed():
-	$Display/SoundProbe3D.setstreamplayer($AudioNode/AudioPosition/AudioStreamPlayer3D)
-	$Display/SoundProbeEffect.setstreamplayer($AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D/AudioStreamPlayer)
+	$Display/SoundProbe3D.setstreamplayer($AudioNode/AudioPosition/AudioStreamPlayer3D, $AudioNode/AudioPosition/AudioStreamPlayer3D.bus)
+	$Display/SoundProbeEffect.setstreamplayer($AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D/AudioStreamPlayer, $AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D.bus)
 
 
 var s = 0
