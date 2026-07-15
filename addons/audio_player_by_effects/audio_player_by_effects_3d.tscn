@@ -9,7 +9,5 @@ script = ExtResource("1_tdgos")
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=1909440586]
 stream = ExtResource("2_y371h")
-max_polyphony = 2
-bus = &"BusEffect3D"
 
 [node name="VelocityTracker3D" parent="." unique_id=1376812999 instance=ExtResource("3_d32i7")]

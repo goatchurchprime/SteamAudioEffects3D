@@ -1,6 +1,5 @@
 extends Node3D
 
-@onready var ap : AudioStreamPlayer3D = get_parent()
 const CMP_EPSILON = 0.00001
 var cached_global_panning_strength = ProjectSettings.get_setting("audio/general/3d_panning_strength")
 
@@ -22,13 +21,20 @@ var cached_global_panning_strength = ProjectSettings.get_setting("audio/general/
 var playereffectbus : String
 var disable_doppler : bool = false
 
-# Doppler implementation made complicated due to removal of VelocityTracker3D: https://github.com/godotengine/godot/pull/64592
+var ap : AudioStreamPlayer3D = null
 
 # This could actually be done on a bus
 var effecthighshelffilter : AudioEffectHighShelfFilter
 var effectamplify : AudioEffectAmplify
 var effectpanner : AudioEffectPanner
 func _ready():
+	if get_parent().is_class("AudioStreamPlayer3D"):
+		ap = get_parent()
+		# bus = ap.bus # Don't override unless upper AudioStreamPlayer is muted
+		$AudioStreamPlayer.stream = ap.stream
+		$AudioStreamPlayer.max_polyphony = ap.max_polyphony
+		$AudioStreamPlayer.playing = ap.playing
+
 	if bus == "":
 		bus = $AudioStreamPlayer.bus
 	playereffectbus = "PlayerEffectBus_%d" % $AudioStreamPlayer.get_instance_id()
@@ -37,6 +43,7 @@ func _ready():
 	assert (AudioServer.get_bus_effect_count(bus_idx) == 0)
 	AudioServer.set_bus_name(bus_idx, playereffectbus)
 	AudioServer.set_bus_send(bus_idx, bus)
+	print("Made bus ", playereffectbus, " sending to ", bus)
 	$AudioStreamPlayer.bus = playereffectbus
 	effecthighshelffilter = AudioEffectHighShelfFilter.new()
 	effecthighshelffilter.resonance = 1.0
@@ -86,6 +93,7 @@ func _update_panning():
 
 	var audio_listener = get_viewport().get_audio_listener_3d()
 	var llistener_node = audio_listener if audio_listener else get_viewport().get_camera_3d()
+
 	var linear_attenuation = 0.0
 	
 	var actual_pitch_scale = pitch_scale;
@@ -156,20 +164,25 @@ func _update_panning():
 	effecthighshelffilter.cutoff_hz = attenuation_filter_cutoff_hz
 
 func _physics_process(delta):
-	volume_db = ap.volume_db
-	max_db = ap.max_db
-	max_distance = ap.max_distance
-	unit_size = ap.unit_size
-	attenuation_model = ap.attenuation_model
-	attenuation_filter_db = ap.attenuation_filter_db
-	attenuation_filter_cutoff_hz = ap.attenuation_filter_cutoff_hz
-	emission_angle_enabled = ap.emission_angle_enabled
-	emission_angle_degrees = ap.emission_angle_degrees
-	emission_angle_filter_attenuation_db = ap.emission_angle_filter_attenuation_db
-	pitch_scale = ap.pitch_scale
-	
-	if doppler_tracking != ap.doppler_tracking:
-		doppler_tracking = ap.doppler_tracking
+	if ap != null:
+		volume_db = ap.volume_db
+		max_db = ap.max_db
+		max_distance = ap.max_distance
+		unit_size = ap.unit_size
+		attenuation_model = ap.attenuation_model
+		attenuation_filter_db = ap.attenuation_filter_db
+		attenuation_filter_cutoff_hz = ap.attenuation_filter_cutoff_hz
+		emission_angle_enabled = ap.emission_angle_enabled
+		emission_angle_degrees = ap.emission_angle_degrees
+		emission_angle_filter_attenuation_db = ap.emission_angle_filter_attenuation_db
+		pitch_scale = ap.pitch_scale
+
+		#$AudioStreamPlayer.playing = ap.playing
+
+		if doppler_tracking != ap.doppler_tracking:
+			doppler_tracking = ap.doppler_tracking
+
+	if $VelocityTracker3D.doppler_tracking != doppler_tracking:
 		$VelocityTracker3D._update_dopper_tracking()
 
 	_update_panning()

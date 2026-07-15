@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" uid="uid://cxkjditufkuri" path="res://main.gd" id="1_0xm2m"]
 [ext_resource type="AudioStream" uid="uid://dl7rlkr1vkqc" path="res://tone330.wav" id="3_1bvp3"]
-[ext_resource type="Script" uid="uid://1mrjobi82rxx" path="res://addons/audio_player_by_effects/audio_player_by_effects3d.gd" id="3_h2yge"]
 [ext_resource type="AudioStream" uid="uid://cgc40uucq0g0d" path="res://audiocheck.net_pinknoise.wav" id="4_1bvp3"]
+[ext_resource type="PackedScene" uid="uid://egvbmkpm3sy0" path="res://addons/audio_player_by_effects/audio_player_by_effects_3d.tscn" id="4_7mycd"]
 [ext_resource type="PackedScene" uid="uid://dmw81fn40ksfv" path="res://sound_probe.tscn" id="4_lquwl"]
 [ext_resource type="PackedScene" uid="uid://v3l1wfvv8ukt" path="res://addons/audio_player_by_effects/velocity_tracker_3d.tscn" id="5_272bh"]
 
@@ -45,15 +45,8 @@ doppler_tracking = 2
 transform = Transform3D(0.9999999, 0, 0, 0, -4.371139e-08, 1.0000001, 0, -0.9999999, -4.371139e-08, 0, 0, 0)
 mesh = SubResource("CylinderMesh_m1hyp")
 
-[node name="AudioPlayerByEffects3D" type="Node3D" parent="AudioNode/AudioPosition/AudioStreamPlayer3D" unique_id=420692142]
-script = ExtResource("3_h2yge")
-
-[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="AudioNode/AudioPosition/AudioStreamPlayer3D/AudioPlayerByEffects3D" unique_id=1636531096]
-stream = ExtResource("3_1bvp3")
-max_polyphony = 2
-bus = &"BusEffect3D"
-
-[node name="VelocityTracker3D" parent="AudioNode/AudioPosition/AudioStreamPlayer3D/AudioPlayerByEffects3D" unique_id=1576006105 instance=ExtResource("5_272bh")]
+[node name="AudioPlayerByEffects3D" parent="AudioNode/AudioPosition/AudioStreamPlayer3D" unique_id=488457095 instance=ExtResource("4_7mycd")]
+bus = "BusEffect3D"
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=106336885]
 transform = Transform3D(1, 0, 0, 0, 0.01457683, 0.9998938, 0, -0.9998938, 0.01457683, 0, 4.711708, 0)
