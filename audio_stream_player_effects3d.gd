@@ -16,10 +16,11 @@ var cached_global_panning_strength = ProjectSettings.get_setting("audio/general/
 @export var emission_angle_degrees = 45.0
 @export var emission_angle_filter_attenuation_db = -12.0
 @export var pitch_scale : float = 1.0
-@export var doppler_tracking : AudioStreamPlayer3D.DopplerTracking = AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED
 @export var bus : String = ""
+@export var doppler_tracking : AudioStreamPlayer3D.DopplerTracking = AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED
 
 var playereffectbus : String
+var disable_doppler : bool = false
 
 # Doppler implementation made complicated due to removal of VelocityTracker3D: https://github.com/godotengine/godot/pull/64592
 
@@ -88,10 +89,13 @@ func _update_panning():
 	var linear_attenuation = 0.0
 	
 	var actual_pitch_scale = pitch_scale;
-	var linear_velocity : Vector3
-	#if doppler_tracking != AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED:
-	#	linear_velocity = velocity_tracker->get_tracked_linear_velocity();
-		
+	var linear_velocity : Vector3 = Vector3.ZERO
+	if doppler_tracking != AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED:
+		linear_velocity = $VelocityTracker3D.get_tracked_linear_velocity()
+
+	var pitch_scale_sum : float = 0.0
+	var pitch_scale_weight : float = 0.0
+
 	for listener_node in [ llistener_node ]:
 		var local_pos = listener_node.global_transform.orthonormalized().affine_inverse() * global_pos
 		var dist = local_pos.length()
@@ -116,7 +120,34 @@ func _update_panning():
 		var listener_volume_vector = _calc_output_vol_stereo(local_pos, cached_global_panning_strength * ap.panning_strength);
 		listener_volume_vector *= multiplier
 		output_volume_vector = _apply_max_volume_from_vector(output_volume_vector, listener_volume_vector);
-		
+
+		if doppler_tracking != AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED:
+			var listener_velocity : Vector3 = Vector3.ZERO
+			var listener_velocity_tracker = listener_node.get_node_or_null("VelocityTracker3D")
+			if listener_velocity_tracker != null:
+				if listener_velocity_tracker.doppler_tracking != listener_node.doppler_tracking:
+					listener_velocity_tracker._update_dopper_tracking()
+			listener_velocity = listener_velocity_tracker.get_tracked_linear_velocity()
+
+			var local_velocity : Vector3 = listener_node.global_transform.orthonormalized().basis.inverse() * (linear_velocity - listener_velocity)
+			if local_velocity != Vector3.ZERO:
+				var approaching : float = local_pos.normalized().dot(local_velocity.normalized());
+				var velocity : float = local_velocity.length();
+				const speed_of_sound = 343.0;
+				var doppler_pitch_scale : float  = pitch_scale * speed_of_sound / (speed_of_sound + velocity * approaching);
+				# limit the pitch scale, so we do not get execeedingly extreme pitch effects in edge cases
+				doppler_pitch_scale = clampf(doppler_pitch_scale, (1.0 / 8.0), 8.0);
+
+				# just use the maximum volume of the current volume vector as weight
+				# so the pitch effect fades out with lower volumes
+				var weight : float  = maxf(listener_volume_vector.x, listener_volume_vector.y)
+				pitch_scale_sum += weight * doppler_pitch_scale
+				pitch_scale_weight += weight
+
+	if pitch_scale_weight > 0.0 and not disable_doppler:
+		actual_pitch_scale = pitch_scale_sum / pitch_scale_weight
+	$AudioStreamPlayer.pitch_scale = actual_pitch_scale
+
 	# solve: output_volume_vector == (vol*(1-pan), vol*(1+pan))
 	effectamplify.volume_linear = (output_volume_vector.x + output_volume_vector.y)/2
 	effectpanner.pan = (output_volume_vector.y - output_volume_vector.x)/effectamplify.volume_linear/2
@@ -135,7 +166,10 @@ func _physics_process(delta):
 	emission_angle_enabled = ap.emission_angle_enabled
 	emission_angle_degrees = ap.emission_angle_degrees
 	emission_angle_filter_attenuation_db = ap.emission_angle_filter_attenuation_db
-	doppler_tracking = ap.doppler_tracking
 	pitch_scale = ap.pitch_scale
+	
+	if doppler_tracking != ap.doppler_tracking:
+		doppler_tracking = ap.doppler_tracking
+		$VelocityTracker3D._update_dopper_tracking()
 
 	_update_panning()

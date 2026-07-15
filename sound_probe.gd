@@ -17,6 +17,7 @@ func setstreamplayer(lstreamplayer, lbus):
 
 var t = 0
 
+var hfac = 2.5
 func _physics_process(delta):
 	t += delta
 	if t > windowseconds:
@@ -27,5 +28,5 @@ func _physics_process(delta):
 	if sai1:
 		var m = sai1.get_magnitude_for_frequency_range(from_hz, to_hz)
 		var x = width*t/windowseconds
-		$Line2D_left.add_point(Vector2(x, height*(1-m.x)))
-		$Line2D_right.add_point(Vector2(x, height*(1-m.y)))
+		$Line2D_left.add_point(Vector2(x, height*(1-m.x*hfac)))
+		$Line2D_right.add_point(Vector2(x, height*(1-m.y*hfac)))

@@ -4,6 +4,7 @@
 [ext_resource type="AudioStream" uid="uid://dl7rlkr1vkqc" path="res://tone330.wav" id="3_1bvp3"]
 [ext_resource type="Script" uid="uid://1mrjobi82rxx" path="res://audio_stream_player_effects3d.gd" id="3_h2yge"]
 [ext_resource type="AudioStream" uid="uid://cgc40uucq0g0d" path="res://audiocheck.net_pinknoise.wav" id="4_1bvp3"]
+[ext_resource type="Script" uid="uid://cupb8dfl68jvc" path="res://velocity_tracker_3d.gd" id="4_7mycd"]
 [ext_resource type="PackedScene" uid="uid://dmw81fn40ksfv" path="res://sound_probe.tscn" id="4_lquwl"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_m1hyp"]
@@ -15,9 +16,13 @@ bottom_radius = 0.1
 script = ExtResource("1_0xm2m")
 
 [node name="AudioListener3D" type="AudioListener3D" parent="." unique_id=490519390]
+doppler_tracking = 2
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="AudioListener3D" unique_id=1105475790]
 mesh = SubResource("BoxMesh_m1hyp")
+
+[node name="VelocityTracker3D" type="Node3D" parent="AudioListener3D" unique_id=1333809257]
+script = ExtResource("4_7mycd")
 
 [node name="AudioNode" type="Node3D" parent="." unique_id=975124444]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 0, 0)
@@ -29,6 +34,7 @@ transform = Transform3D(-4.3711385e-08, 0, 0.99999994, 0, 1, 0, -0.99999994, 0, 
 transform = Transform3D(1.0000001, 0, 0, 0, 1, 0, 0, 0, 1.0000001, 0, 0, 0)
 stream = ExtResource("3_1bvp3")
 max_distance = 22.0
+max_polyphony = 2
 bus = &"BusServer3D"
 emission_angle_enabled = true
 emission_angle_degrees = 35.0
@@ -42,24 +48,14 @@ mesh = SubResource("CylinderMesh_m1hyp")
 
 [node name="AudioStreamEffect3D" type="Node3D" parent="AudioNode/AudioPosition/AudioStreamPlayer3D" unique_id=420692142]
 script = ExtResource("3_h2yge")
-max_distance = null
-volume_db = null
-max_db = null
-unit_size = null
-attenuation_model = null
-attenuation_filter_db = null
-attenuation_filter_cutoff_hz = null
-emission_angle_enabled = null
-emission_angle_degrees = null
-emission_angle_filter_attenuation_db = null
-pitch_scale = null
-doppler_tracking = null
-bus = null
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D" unique_id=1636531096]
 stream = ExtResource("3_1bvp3")
-max_polyphony = 5
+max_polyphony = 2
 bus = &"BusEffect3D"
+
+[node name="VelocityTracker3D" type="Node3D" parent="AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D" unique_id=768755755]
+script = ExtResource("4_7mycd")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=106336885]
 transform = Transform3D(1, 0, 0, 0, 0.01457683, 0.9998938, 0, -0.9998938, 0.01457683, 0, 4.711708, 0)
@@ -99,7 +95,12 @@ text = "Attenuate "
 layout_mode = 2
 text = "Overlay "
 
+[node name="DisableDoppler" type="CheckButton" parent="Control/HBox" unique_id=1133660965]
+layout_mode = 2
+text = "DisDoppler "
+
 [node name="SlowerMotion" type="CheckButton" parent="Control/HBox" unique_id=775655120]
+visible = false
 layout_mode = 2
 text = "Slower Motion
 "

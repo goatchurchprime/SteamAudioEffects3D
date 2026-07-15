@@ -21,10 +21,12 @@ func _physics_process(delta):
 		$Display/SoundProbe3D.position.y = -102
 		$Display/SoundProbeEffect.position.y = 102
 
+	$AudioListener3D.position.x = fmod(t, 0.5)
+	$AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D.disable_doppler = $Control/HBox/DisableDoppler.button_pressed
+
 func _on_play_button_pressed():
 	$Display/SoundProbe3D.setstreamplayer($AudioNode/AudioPosition/AudioStreamPlayer3D, $AudioNode/AudioPosition/AudioStreamPlayer3D.bus)
 	$Display/SoundProbeEffect.setstreamplayer($AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D/AudioStreamPlayer, $AudioNode/AudioPosition/AudioStreamPlayer3D/AudioStreamEffect3D.bus)
-
 
 var s = 0
 func _on_polyphony_test_pressed():
