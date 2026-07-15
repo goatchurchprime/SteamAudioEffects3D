@@ -13,4 +13,4 @@ VelocityTracker3D as a child of those nodes to measure its velocity.
 To check for errors in the conversion of these complex C++ functions, the measurement 
 of the output spectrum from a simple sinewave tone is plotted.
 
-<img width="891" height="493" alt="image" src="https://github.com/user-attachments/assets/ead05add-fa9a-4a41-9eda-9927577cbeef" />
+<img width="866" height="489" alt="image" src="https://github.com/user-attachments/assets/c690a633-c47e-49fe-a7b6-0927155ba948" />
