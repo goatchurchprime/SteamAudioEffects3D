@@ -1,6 +1,6 @@
 extends Node3D
 
-# Needs to be a child of Camera3D, AudioListener3D, or AudioStreamEffect3D
+# Needs to be a child of Camera3D, AudioListener3D, or AudioPlayerByEffects3D
 
 class PositionHistory:
 	var frame : int = 0;
