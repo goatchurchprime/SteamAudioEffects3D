@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://fmy8eas15gj0"]
 
-[ext_resource type="Script" uid="uid://cvahlhu5je1ny" path="res://single_tone_recording.gd" id="1_ir4i6"]
+[ext_resource type="Script" path="res://spatialization_verifier/single_tone_recording.gd" id="1_ir4i6"]
 
 [sub_resource type="AudioStreamGenerator" id="AudioStreamGenerator_m1hyp"]
 mix_rate = 8000.0

@@ -1,6 +1,48 @@
 This addon replicates the functioning of the hidden 
 AudioEffects internal to the AudioServer that are managed by each AudioStreamPlayer3D.
 
+## Steam Audio HRTF experiment
+
+The project also contains a separate, minimal `AudioEffectSteamSpatial` GDExtension. It is deliberately not integrated
+into `AudioPlayerByEffects3D`: that node remains the reference experiment which replicates Godot's spatialization.
+The Steam effect resource exposes `direction`, `gain`, `spatial_blend`, and HRTF `interpolation`; its required
+`AudioEffectSteamSpatialInstance` owns the Steam Audio context, built-in HRTF, binaural effect, and audio buffers.
+There is no separate spatial-source processor or adapter layer.
+
+Build and run on NixOS:
+
+```sh
+git submodule update --init --recursive
+nix develop --command scripts/build_linux.sh
+nix develop --command godot4 --editor --path .
+```
+
+The native dependencies remain separately owned and pinned: `godot-cpp` is at 10.0.0-rc1 (Godot 4.6), and Valve
+Steam Audio is at v4.8.1. `scripts/build_linux.sh` builds Valve's `libphonon.so`, then links the small Godot-specific
+GDExtension against it. The same boundary is appropriate for Opus, RNNoise, ONNX Runtime, and similar libraries.
+
+Current deliberate limits: the HRTF path assumes Godot's current 512-frame audio mix block, takes a mono source
+(stereo is folded down), and implements direction plus distance gain only. It does not yet add air absorption,
+occlusion, reflections, or distance-of-flight delay. These should be added one at a time while retaining the old
+stack as an A/B reference.
+
+### Native/addon in-editor comparison
+
+Open `ineditordemo.tscn`, select its `Main` root, and click **Toggle A/B Preview** in the Inspector. The tool script
+temporarily excludes the editor's four 3D viewports from native audio-listener selection, makes the scene's
+`PreviewListener` current, then starts both implementations with the same stream and position. All viewport states
+are restored when preview stops. Drag `SoundSource` or `PreviewListener` and compare `Native3DPreview` (Godot's
+`AudioStreamPlayer3D`) with the saved `PlayerEffectBus_Editor` inspection bus. The saved bus exposes the addon's
+HighShelf, Amplify, and Panner controls in the Audio dock; the native meter bus exists only while
+preview is enabled. The two Source Audition properties mute the corresponding player node at source—no bus mute or
+solo state is used. The preview deliberately uses the mono pink-noise fixture: the bus-effect reconstruction assumes
+a mono VoIP-style source, whereas arbitrary stereo material is not mathematically equivalent under a stereo panner.
+
+The waveform application shown in the original experiment now lives under `spatialization_verifier/`. Its root
+installs `spatialization_verifier/bus_layout.tres` in `_enter_tree()`, before its audio children initialize, so its
+analyzer, recording, and delay buses do not pollute the project default layout. Runtime `AudioPlayerByEffects3D`
+instances continue to create and remove their own private processing buses.
+
 Use the compound AudioPlayerByEffects3D scene instead of an AudioStreamPlayer3D (or put one as a child for comparison).
 On startup this creates a new bus with `AudioEffectHighShelfFilter`, `AudioEffectAmplify` and `AudioEffectPanner` 
 whose parameters are updated using exactly the same calculations as 

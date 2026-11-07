@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dmw81fn40ksfv"]
 
-[ext_resource type="Script" uid="uid://cot7finklbbv8" path="res://sound_probe.gd" id="1_75rg3"]
+[ext_resource type="Script" path="res://spatialization_verifier/sound_probe.gd" id="1_75rg3"]
 
 [node name="SoundProbe" type="Node2D" unique_id=1997166620]
 script = ExtResource("1_75rg3")

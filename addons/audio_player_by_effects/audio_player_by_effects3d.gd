@@ -1,3 +1,4 @@
+@tool
 extends Node3D
 
 const CMP_EPSILON = 0.00001
@@ -17,6 +18,8 @@ var cached_global_panning_strength = ProjectSettings.get_setting("audio/general/
 @export var pitch_scale : float = 1.0
 @export var bus : String = ""
 @export var doppler_tracking : AudioStreamPlayer3D.DopplerTracking = AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED
+@export_group("Bus Debugging")
+@export var existing_effect_bus: StringName = &""
 
 var playereffectbus : String
 var disable_doppler : bool = false
@@ -27,6 +30,7 @@ var ap : AudioStreamPlayer3D = null
 var effecthighshelffilter : AudioEffectHighShelfFilter
 var effectamplify : AudioEffectAmplify
 var effectpanner : AudioEffectPanner
+var effect_bus_index := -1
 func _ready():
 	if get_parent().is_class("AudioStreamPlayer3D"):
 		ap = get_parent()
@@ -35,23 +39,82 @@ func _ready():
 		$AudioStreamPlayer.max_polyphony = ap.max_polyphony
 		$AudioStreamPlayer.playing = ap.playing
 
+	if Engine.is_editor_hint():
+		# The editor preview controller creates its temporary buses explicitly.
+		# Merely opening a scene must not mutate the editor's AudioBusLayout.
+		return
 	if bus == "":
 		bus = $AudioStreamPlayer.bus
+	if existing_effect_bus != &"":
+		bus = String(existing_effect_bus)
+		_attach_existing_effect_bus()
+		return
+	_create_runtime_effect_bus()
+
+func begin_editor_preview(preview_bus: StringName) -> void:
+	if not Engine.is_editor_hint():
+		return
+	bus = String(existing_effect_bus if existing_effect_bus != &"" else preview_bus)
+	_attach_existing_effect_bus()
+
+func end_editor_preview() -> void:
+	if not Engine.is_editor_hint():
+		return
+	$AudioStreamPlayer.stop()
+	$AudioStreamPlayer.bus = &"Master"
+	effect_bus_index = -1
+	effecthighshelffilter = null
+	effectamplify = null
+	effectpanner = null
+
+func _attach_existing_effect_bus():
+	# AudioServer bus mutations made by @tool scripts belong to the editor's live
+	# AudioBusLayout and can be saved into default_bus_layout.tres. For previewing,
+	# reuse the deliberately configured output bus instead of creating local buses.
+	effect_bus_index = AudioServer.get_bus_index(bus)
+	if effect_bus_index < 0:
+		push_warning("Existing effect bus '%s' does not exist" % bus)
+		return
+	$AudioStreamPlayer.bus = bus
+	for effect_index in AudioServer.get_bus_effect_count(effect_bus_index):
+		var candidate := AudioServer.get_bus_effect(effect_bus_index, effect_index)
+		if candidate is AudioEffectHighShelfFilter:
+			effecthighshelffilter = candidate
+		elif candidate is AudioEffectAmplify:
+			effectamplify = candidate
+		elif candidate is AudioEffectPanner:
+			effectpanner = candidate
+	if effecthighshelffilter == null or effectamplify == null or effectpanner == null:
+		push_warning("Existing effect bus '%s' needs HighShelf, Amplify, and Panner effects" % bus)
+
+func _create_runtime_effect_bus():
 	playereffectbus = "PlayerEffectBus_%d" % $AudioStreamPlayer.get_instance_id()
-	AudioServer.add_bus()
-	var bus_idx = AudioServer.bus_count - 1
-	assert (AudioServer.get_bus_effect_count(bus_idx) == 0)
-	AudioServer.set_bus_name(bus_idx, playereffectbus)
-	AudioServer.set_bus_send(bus_idx, bus)
+	effect_bus_index = AudioServer.get_bus_index(playereffectbus)
+	if effect_bus_index < 0:
+		AudioServer.add_bus()
+		effect_bus_index = AudioServer.bus_count - 1
+	else:
+		while AudioServer.get_bus_effect_count(effect_bus_index) > 0:
+			AudioServer.remove_bus_effect(effect_bus_index, 0)
+	assert (AudioServer.get_bus_effect_count(effect_bus_index) == 0)
+	AudioServer.set_bus_name(effect_bus_index, playereffectbus)
+	AudioServer.set_bus_send(effect_bus_index, bus)
 	print("Made bus ", playereffectbus, " sending to ", bus)
 	$AudioStreamPlayer.bus = playereffectbus
 	effecthighshelffilter = AudioEffectHighShelfFilter.new()
 	effecthighshelffilter.resonance = 1.0
-	AudioServer.add_bus_effect(bus_idx, effecthighshelffilter)
+	AudioServer.add_bus_effect(effect_bus_index, effecthighshelffilter)
 	effectamplify = AudioEffectAmplify.new()
-	AudioServer.add_bus_effect(bus_idx, effectamplify)
+	AudioServer.add_bus_effect(effect_bus_index, effectamplify)
 	effectpanner = AudioEffectPanner.new()
-	AudioServer.add_bus_effect(bus_idx, effectpanner)
+	AudioServer.add_bus_effect(effect_bus_index, effectpanner)
+
+func _exit_tree():
+	if Engine.is_editor_hint():
+		return
+	var current_index := AudioServer.get_bus_index(playereffectbus)
+	if current_index >= 0:
+		AudioServer.remove_bus(current_index)
 
 func _get_attenuation_db(p_distance):
 	var att = 0
@@ -59,7 +122,7 @@ func _get_attenuation_db(p_distance):
 		AudioStreamPlayer3D.ATTENUATION_INVERSE_DISTANCE:
 			att = linear_to_db(1.0 / ((p_distance / unit_size) + CMP_EPSILON));
 		AudioStreamPlayer3D.ATTENUATION_INVERSE_SQUARE_DISTANCE:
-			var d = (p_distance / ap.unit_size)
+			var d = (p_distance / unit_size)
 			d *= d
 			att = linear_to_db(1.0 / (d + CMP_EPSILON));
 		AudioStreamPlayer3D.ATTENUATION_LOGARITHMIC:
@@ -87,12 +150,16 @@ func _apply_max_volume_from_vector(output_volume_vector : Vector2, listener_volu
 # Implement AudioStreamPlayer3D::_update_panning()
 # https://github.com/godotengine/godot/blob/master/scene/3d/audio_stream_player_3d.cpp#L382
 func _update_panning():
+	if effecthighshelffilter == null or effectamplify == null or effectpanner == null:
+		return
 	var output_volume_vector = Vector2(0,0)
 
 	var global_pos = global_transform.origin
 
 	var audio_listener = get_viewport().get_audio_listener_3d()
 	var llistener_node = audio_listener if audio_listener else get_viewport().get_camera_3d()
+	if llistener_node == null:
+		return
 
 	var linear_attenuation = 0.0
 	
@@ -113,10 +180,9 @@ func _update_panning():
 		var multiplier = db_to_linear(_get_attenuation_db(dist));
 		if (max_distance > 0):
 			multiplier *= maxf(0, 1.0 - (dist / max_distance));
-
 		var db_att = (1.0 - minf(1.0, multiplier)) * attenuation_filter_db;
 
-		if ap.emission_angle_enabled:
+		if emission_angle_enabled:
 			var listenertopos = global_pos - listener_node.global_transform.origin
 			var c = listenertopos.normalized().dot(global_transform.basis.z.normalized())
 			var angle = rad_to_deg(acos(c))
@@ -125,7 +191,8 @@ func _update_panning():
 
 		linear_attenuation = maxf(linear_attenuation, db_to_linear(db_att))
 
-		var listener_volume_vector = _calc_output_vol_stereo(local_pos, cached_global_panning_strength * ap.panning_strength);
+		var source_panning_strength := ap.panning_strength if ap != null else 1.0
+		var listener_volume_vector = _calc_output_vol_stereo(local_pos, cached_global_panning_strength * source_panning_strength);
 		listener_volume_vector *= multiplier
 		output_volume_vector = _apply_max_volume_from_vector(output_volume_vector, listener_volume_vector);
 
@@ -135,7 +202,7 @@ func _update_panning():
 			if listener_velocity_tracker != null:
 				if listener_velocity_tracker.doppler_tracking != listener_node.doppler_tracking:
 					listener_velocity_tracker._update_dopper_tracking()
-			listener_velocity = listener_velocity_tracker.get_tracked_linear_velocity()
+				listener_velocity = listener_velocity_tracker.get_tracked_linear_velocity()
 
 			var local_velocity : Vector3 = listener_node.global_transform.orthonormalized().basis.inverse() * (linear_velocity - listener_velocity)
 			if local_velocity != Vector3.ZERO:
@@ -158,12 +225,16 @@ func _update_panning():
 
 	# solve: output_volume_vector == (vol*(1-pan), vol*(1+pan))
 	effectamplify.volume_linear = (output_volume_vector.x + output_volume_vector.y)/2
-	effectpanner.pan = (output_volume_vector.y - output_volume_vector.x)/effectamplify.volume_linear/2
+	effectpanner.pan = (output_volume_vector.y - output_volume_vector.x)/effectamplify.volume_linear/2 if effectamplify.volume_linear > CMP_EPSILON else 0.0
 	#if linear_attenuation == 0 : bypass
 	effecthighshelffilter.gain = linear_attenuation
 	effecthighshelffilter.cutoff_hz = attenuation_filter_cutoff_hz
 
 func _physics_process(delta):
+	# Several edited scenes can be open together. Only the player explicitly
+	# started by the preview controller may drive the shared editor scratch bus.
+	if Engine.is_editor_hint() and not $AudioStreamPlayer.playing:
+		return
 	if ap != null:
 		volume_db = ap.volume_db
 		max_db = ap.max_db
@@ -182,7 +253,9 @@ func _physics_process(delta):
 		if doppler_tracking != ap.doppler_tracking:
 			doppler_tracking = ap.doppler_tracking
 
-	if $VelocityTracker3D.doppler_tracking != doppler_tracking:
+	# VelocityTracker3D is intentionally still a runtime-only helper. The editor
+	# preview demonstrates stationary panning and attenuation, not Doppler.
+	if not Engine.is_editor_hint() and $VelocityTracker3D.doppler_tracking != doppler_tracking:
 		$VelocityTracker3D._update_dopper_tracking()
 
 	_update_panning()

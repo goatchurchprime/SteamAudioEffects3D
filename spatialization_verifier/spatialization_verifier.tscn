@@ -1,10 +1,10 @@
 [gd_scene format=3 uid="uid://br23ps4a7qoi1"]
 
-[ext_resource type="Script" uid="uid://cxkjditufkuri" path="res://main.gd" id="1_0xm2m"]
+[ext_resource type="Script" path="res://spatialization_verifier/spatialization_verifier.gd" id="1_0xm2m"]
 [ext_resource type="AudioStream" uid="uid://dl7rlkr1vkqc" path="res://tone330.wav" id="3_1bvp3"]
 [ext_resource type="AudioStream" uid="uid://cgc40uucq0g0d" path="res://audiocheck.net_pinknoise.wav" id="4_1bvp3"]
 [ext_resource type="PackedScene" uid="uid://egvbmkpm3sy0" path="res://addons/audio_player_by_effects/audio_player_by_effects_3d.tscn" id="4_7mycd"]
-[ext_resource type="PackedScene" uid="uid://dmw81fn40ksfv" path="res://sound_probe.tscn" id="4_lquwl"]
+[ext_resource type="PackedScene" path="res://spatialization_verifier/sound_probe.tscn" id="4_lquwl"]
 [ext_resource type="PackedScene" uid="uid://v3l1wfvv8ukt" path="res://addons/audio_player_by_effects/velocity_tracker_3d.tscn" id="5_272bh"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_m1hyp"]
@@ -12,7 +12,7 @@
 [sub_resource type="CylinderMesh" id="CylinderMesh_m1hyp"]
 bottom_radius = 0.1
 
-[node name="Main" type="Node3D" unique_id=1197520070]
+[node name="SpatializationVerifier" type="Node3D" unique_id=1197520070]
 script = ExtResource("1_0xm2m")
 
 [node name="AudioListener3D" type="AudioListener3D" parent="." unique_id=490519390]

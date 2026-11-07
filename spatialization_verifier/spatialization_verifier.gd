@@ -1,6 +1,13 @@
 extends Node3D
 
+const VERIFIER_BUS_LAYOUT := preload("res://spatialization_verifier/bus_layout.tres")
+
 var t = 0.0
+
+func _enter_tree() -> void:
+	# Install the verifier's private test layout before child audio nodes enter.
+	AudioServer.set_bus_layout(VERIFIER_BUS_LAYOUT)
+
 func _physics_process(delta):
 	t += delta
 	var slowermotion = $Control/HBox/SlowerMotion.button_pressed

@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3 uid="uid://dolkr4i588ou"]
+
+[ext_resource type="AudioStream" uid="uid://cgc40uucq0g0d" path="res://audiocheck.net_pinknoise.wav" id="1_audio"]
+[ext_resource type="Script" path="res://ineditordemo.gd" id="2_preview"]
+[ext_resource type="PackedScene" uid="uid://egvbmkpm3sy0" path="res://addons/audio_player_by_effects/audio_player_by_effects_3d.tscn" id="3_effects_player"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_source"]
+radius = 0.25
+height = 0.5
+
+[node name="Main" type="Node3D" unique_id=1921461212]
+script = ExtResource("2_preview")
+
+[node name="PreviewListener" type="AudioListener3D" parent="."]
+
+[node name="NativeListenerTraversalAnchor" type="Camera3D" parent="."]
+
+[node name="SoundSource" type="Node3D" parent="." unique_id=231494884]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.628388, 0, 0)
+
+[node name="SourceMarker" type="MeshInstance3D" parent="SoundSource"]
+mesh = SubResource("SphereMesh_source")
+
+[node name="NativeAudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="SoundSource"]
+stream = ExtResource("1_audio")
+unit_size = 10.0
+bus = &"Master"
+
+[node name="AudioPlayerByEffects3D" parent="SoundSource" instance=ExtResource("3_effects_player")]
+unit_size = 10.0
+bus = "Master"
+existing_effect_bus = &"PlayerEffectBus_Editor"

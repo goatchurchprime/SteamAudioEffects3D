@@ -1,0 +1,6 @@
+[submodule "godot-cpp"]
+	path = godot-cpp
+	url = https://github.com/godotengine/godot-cpp.git
+[submodule "thirdparty/steam-audio"]
+	path = thirdparty/steam-audio
+	url = https://github.com/ValveSoftware/steam-audio.git

@@ -1,62 +1,26 @@
 [gd_resource type="AudioBusLayout" format=3 uid="uid://cm18pdhrdpjhf"]
 
-[sub_resource type="AudioEffectSpectrumAnalyzer" id="AudioEffectSpectrumAnalyzer_j3pel"]
-resource_name = "SpectrumAnalyzer"
-fft_size = 0
+[sub_resource type="AudioEffectHighShelfFilter" id="AudioEffectHighShelfFilter_j3pel"]
+resource_name = "Distance High Shelf"
+cutoff_hz = 5000.0
+resonance = 1.0
 
-[sub_resource type="AudioEffectSpectrumAnalyzer" id="AudioEffectSpectrumAnalyzer_g28q7"]
-resource_name = "SpectrumAnalyzer"
-fft_size = 0
+[sub_resource type="AudioEffectAmplify" id="AudioEffectAmplify_g28q7"]
+resource_name = "Spatial Gain"
 
-[sub_resource type="AudioEffectRecord" id="AudioEffectRecord_j3pel"]
-resource_name = "Record"
-
-[sub_resource type="AudioEffectPanner" id="AudioEffectPanner_j3pel"]
-resource_name = "Panner"
-pan = -0.29
-
-[sub_resource type="AudioEffectDelay" id="AudioEffectDelay_j3pel"]
-resource_name = "Delay"
-dry = 0.0
-tap1_delay_ms = 1.0
-tap1_level_db = 0.0
-tap1_pan = -1.0
-tap2_delay_ms = 0.0
-tap2_level_db = 0.0
-tap2_pan = 1.0
+[sub_resource type="AudioEffectPanner" id="AudioEffectPanner_n8wo2"]
+resource_name = "Spatial Panner"
 
 [resource]
-bus/1/name = &"BusServer3D"
+bus/1/name = &"PlayerEffectBus_Editor"
 bus/1/solo = false
 bus/1/mute = false
 bus/1/bypass_fx = false
 bus/1/volume_db = 0.0
 bus/1/send = &"Master"
-bus/1/effect/0/effect = SubResource("AudioEffectSpectrumAnalyzer_j3pel")
+bus/1/effect/0/effect = SubResource("AudioEffectHighShelfFilter_j3pel")
 bus/1/effect/0/enabled = true
-bus/2/name = &"BusEffect3D"
-bus/2/solo = false
-bus/2/mute = false
-bus/2/bypass_fx = false
-bus/2/volume_db = 0.0
-bus/2/send = &"Master"
-bus/2/effect/0/effect = SubResource("AudioEffectSpectrumAnalyzer_g28q7")
-bus/2/effect/0/enabled = true
-bus/3/name = &"ToneRecording"
-bus/3/solo = false
-bus/3/mute = false
-bus/3/bypass_fx = false
-bus/3/volume_db = 0.0
-bus/3/send = &"Master"
-bus/3/effect/0/effect = SubResource("AudioEffectRecord_j3pel")
-bus/3/effect/0/enabled = true
-bus/4/name = &"DelayExperiment"
-bus/4/solo = false
-bus/4/mute = false
-bus/4/bypass_fx = false
-bus/4/volume_db = 0.0
-bus/4/send = &"Master"
-bus/4/effect/0/effect = SubResource("AudioEffectPanner_j3pel")
-bus/4/effect/0/enabled = true
-bus/4/effect/1/effect = SubResource("AudioEffectDelay_j3pel")
-bus/4/effect/1/enabled = true
+bus/1/effect/1/effect = SubResource("AudioEffectAmplify_g28q7")
+bus/1/effect/1/enabled = true
+bus/1/effect/2/effect = SubResource("AudioEffectPanner_n8wo2")
+bus/1/effect/2/enabled = true
