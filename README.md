@@ -1,9 +1,17 @@
-This addon replicates the functioning of the hidden 
-AudioEffects internal to the AudioServer that are managed by each AudioStreamPlayer3D.
+# SteamAudioEffects3D
+
+This repository is a history-preserving sibling of
+[AudioStreamEffects3D](https://github.com/goatchurchprime/AudioStreamEffects3D). It keeps the same
+per-player bus interface and reference spatialization experiment, then uses that architecture to make Steam Audio
+spatialization available without waiting for corresponding changes to Godot's `AudioServer`.
+
+The reference repository remains focused on reproducing and examining Godot's hidden per-player spatial effects.
+Reusable architectural improvements can therefore be developed here and mapped back cleanly without coupling that
+experiment to Steam Audio.
 
 ## Steam Audio HRTF experiment
 
-The project also contains a separate, minimal `AudioEffectSteamSpatial` GDExtension. It is deliberately not integrated
+The project currently contains a minimal `AudioEffectSteamSpatial` GDExtension. It is deliberately not integrated
 into `AudioPlayerByEffects3D`: that node remains the reference experiment which replicates Godot's spatialization.
 The Steam effect resource exposes `direction`, `gain`, `spatial_blend`, and HRTF `interpolation`; its required
 `AudioEffectSteamSpatialInstance` owns the Steam Audio context, built-in HRTF, binaural effect, and audio buffers.
@@ -14,8 +22,12 @@ Build and run on NixOS:
 ```sh
 git submodule update --init --recursive
 nix develop --command scripts/build_linux.sh
+nix develop --command godot4 --headless --path . --import
+nix develop --command godot4 --headless --audio-driver Dummy --path . --script res://tests/steam_spatial_smoke.gd
 nix develop --command godot4 --editor --path .
 ```
+
+The import step makes Godot discover the GDExtension and resource UIDs in a fresh checkout before the smoke test.
 
 The native dependencies remain separately owned and pinned: `godot-cpp` is at 10.0.0-rc1 (Godot 4.6), and Valve
 Steam Audio is at v4.8.1. `scripts/build_linux.sh` builds Valve's `libphonon.so`, then links the small Godot-specific
@@ -26,7 +38,7 @@ Current deliberate limits: the HRTF path assumes Godot's current 512-frame audio
 occlusion, reflections, or distance-of-flight delay. These should be added one at a time while retaining the old
 stack as an A/B reference.
 
-### Native/addon in-editor comparison
+## Native/addon in-editor comparison
 
 Open `ineditordemo.tscn`, select its `Main` root, and click **Toggle A/B Preview** in the Inspector. The tool script
 temporarily excludes the editor's four 3D viewports from native audio-listener selection, makes the scene's
