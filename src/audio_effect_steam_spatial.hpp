@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include <vector>
 
 #include <godot_cpp/classes/audio_effect.hpp>
 #include <godot_cpp/classes/audio_effect_instance.hpp>
@@ -59,19 +60,20 @@ public:
 class AudioEffectSteamSpatialInstance : public AudioEffectInstance {
 	GDCLASS(AudioEffectSteamSpatialInstance, AudioEffectInstance);
 
-	static constexpr int FRAME_SIZE = 512;
-
 	std::shared_ptr<AudioEffectSteamSpatial::Parameters> parameters;
 	IPLContext context = nullptr;
 	IPLHRTF hrtf = nullptr;
 	IPLBinauralEffect binaural_effect = nullptr;
 	IPLAudioBuffer input_buffer{};
 	IPLAudioBuffer output_buffer{};
-	std::array<float, FRAME_SIZE> mono{};
+	std::vector<float> mono;
 	std::array<float *, 1> input_channels{};
-	bool ready = false;
+	int32_t sampling_rate = 0;
+	int32_t processing_frame_size = 0;
+	bool configured = false;
 
 	void release_steam_audio();
+	bool ensure_processing_size(int32_t frame_count);
 
 protected:
 	static void _bind_methods();

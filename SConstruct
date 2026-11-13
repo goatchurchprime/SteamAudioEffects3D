@@ -29,8 +29,18 @@ else:
 
 addon_bin = "addons/steam_spatial/bin"
 os.makedirs(addon_bin, exist_ok=True)
+sources = Glob("src/*.cpp")
+if env["target"] in ["editor", "template_debug"]:
+    try:
+        doc_data = env.GodotCPPDocData(
+            "src/gen/doc_data.gen.cpp",
+            source=Glob("doc_classes/*.xml"),
+        )
+        sources.append(doc_data)
+    except AttributeError:
+        print("Not including class reference: godot-cpp predates GDExtension documentation support.")
 library = env.SharedLibrary(
     f"{addon_bin}/libsteam_spatial{env['suffix']}{env['SHLIBSUFFIX']}",
-    source=Glob("src/*.cpp"),
+    source=sources,
 )
 Default(library)

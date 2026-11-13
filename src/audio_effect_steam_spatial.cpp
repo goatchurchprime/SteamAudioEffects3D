@@ -5,6 +5,7 @@
 
 #include <godot_cpp/classes/audio_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/print_string.hpp>
 
 namespace godot {
 
@@ -89,21 +90,39 @@ void AudioEffectSteamSpatialInstance::release_steam_audio() {
 	if (context) {
 		iplContextRelease(&context);
 	}
-	ready = false;
+	input_buffer = {};
+	output_buffer = {};
+	processing_frame_size = 0;
 }
 
 void AudioEffectSteamSpatialInstance::set_parameters(const std::shared_ptr<AudioEffectSteamSpatial::Parameters> &value) {
 	parameters = value;
+	sampling_rate = static_cast<int32_t>(AudioServer::get_singleton()->get_mix_rate());
+	configured = sampling_rate > 0;
+}
+
+bool AudioEffectSteamSpatialInstance::ensure_processing_size(int32_t frame_count) {
+	if (!configured || frame_count <= 0) {
+		return false;
+	}
+	if (binaural_effect && output_buffer.data && processing_frame_size == frame_count) {
+		return true;
+	}
+	if (processing_frame_size != 0) {
+		print_verbose("AudioEffectSteamSpatial: processing frame size changed from ", processing_frame_size, " to ", frame_count, "; rebuilding Steam Audio buffers.");
+	}
+
+	release_steam_audio();
 
 	IPLContextSettings context_settings{};
 	context_settings.version = STEAMAUDIO_VERSION;
 	if (iplContextCreate(&context_settings, &context) != IPL_STATUS_SUCCESS) {
-		return;
+		return false;
 	}
 
 	IPLAudioSettings audio_settings{};
-	audio_settings.samplingRate = static_cast<IPLint32>(AudioServer::get_singleton()->get_mix_rate());
-	audio_settings.frameSize = FRAME_SIZE;
+	audio_settings.samplingRate = sampling_rate;
+	audio_settings.frameSize = frame_count;
 
 	IPLHRTFSettings hrtf_settings{};
 	hrtf_settings.type = IPL_HRTFTYPE_DEFAULT;
@@ -111,30 +130,32 @@ void AudioEffectSteamSpatialInstance::set_parameters(const std::shared_ptr<Audio
 	hrtf_settings.normType = IPL_HRTFNORMTYPE_NONE;
 	if (iplHRTFCreate(context, &audio_settings, &hrtf_settings, &hrtf) != IPL_STATUS_SUCCESS) {
 		release_steam_audio();
-		return;
+		return false;
 	}
 
 	IPLBinauralEffectSettings effect_settings{};
 	effect_settings.hrtf = hrtf;
 	if (iplBinauralEffectCreate(context, &audio_settings, &effect_settings, &binaural_effect) != IPL_STATUS_SUCCESS) {
 		release_steam_audio();
-		return;
+		return false;
 	}
 
+	mono.assign(frame_count, 0.0f);
 	input_channels[0] = mono.data();
 	input_buffer.numChannels = 1;
-	input_buffer.numSamples = FRAME_SIZE;
+	input_buffer.numSamples = frame_count;
 	input_buffer.data = input_channels.data();
-	if (iplAudioBufferAllocate(context, 2, FRAME_SIZE, &output_buffer) != IPL_STATUS_SUCCESS) {
+	if (iplAudioBufferAllocate(context, 2, frame_count, &output_buffer) != IPL_STATUS_SUCCESS) {
 		release_steam_audio();
-		return;
+		return false;
 	}
-	ready = true;
+	processing_frame_size = frame_count;
+	return true;
 }
 
 void AudioEffectSteamSpatialInstance::_process(const void *src_buffer, AudioFrame *dst_buffer, int32_t frame_count) {
 	const auto *src = static_cast<const AudioFrame *>(src_buffer);
-	if (!ready || !parameters || frame_count != FRAME_SIZE) {
+	if (!parameters || !ensure_processing_size(frame_count)) {
 		std::copy_n(src, frame_count, dst_buffer);
 		return;
 	}
@@ -174,8 +195,8 @@ void AudioEffectSteamSpatialInstance::_process(const void *src_buffer, AudioFram
 	}
 }
 
-bool AudioEffectSteamSpatialInstance::_process_silence() const { return true; }
-bool AudioEffectSteamSpatialInstance::is_ready() const { return ready; }
+bool AudioEffectSteamSpatialInstance::_process_silence() const { return false; }
+bool AudioEffectSteamSpatialInstance::is_ready() const { return configured; }
 
 void AudioEffectSteamSpatialInstance::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_ready"), &AudioEffectSteamSpatialInstance::is_ready);

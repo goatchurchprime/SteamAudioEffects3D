@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioEffectSteamReflectionSend" inherits="AudioEffect" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Passes dry audio onward while submitting Steam Audio reflections to an Ambisonic return effect.
+	</brief_description>
+	<description>
+		This effect belongs before [AudioEffectSteamDirect] and [AudioEffectSteamSpatial]. Its Godot stereo output is an unchanged copy of its input. In parallel, it folds the input to mono, applies Steam Audio's parametric reflection effect, packages the diffuse result as a first-order omnidirectional Ambisonic block, and submits that block to [member target].
+		The target is the stable [AudioEffectSteamReflectionHRTF] resource, not its transient [AudioEffectInstance]. Consequently, Godot may rebuild effect instances when the bus layout or channel configuration changes without breaking the relationship. The target resource directly owns four dynamically sized channel arrays and copy-adds submissions into them.
+		This initial implementation exposes manual RT60 values and does not inspect scene geometry. A future convolution producer can submit directional Ambisonic reflection data through the same target interface.
+	</description>
+	<tutorials>
+		<link title="Steam Audio Reflection Effect">https://valvesoftware.github.io/steam-audio/doc/capi/reflections-effect.html</link>
+	</tutorials>
+	<members>
+		<member name="enabled" type="bool" setter="set_enabled" getter="is_enabled" default="false">
+			If [code]true[/code], generates and submits reflected audio. The dry signal remains unchanged regardless of this value.
+		</member>
+		<member name="reverb_times" type="Vector3" setter="set_reverb_times" getter="get_reverb_times" default="Vector3(1, 0.8, 0.5)">
+			Low-, mid-, and high-frequency RT60 decay times in seconds. Components are clamped to [code]0.1[/code]–[code]20.0[/code].
+		</member>
+		<member name="send_gain" type="float" setter="set_send_gain" getter="get_send_gain" default="0.25">
+			Nonnegative linear gain applied to the reflected signal before submission.
+		</member>
+		<member name="target" type="AudioEffectSteamReflectionHRTF" setter="set_target" getter="get_target">
+			Receiver resource that accumulates and HRTF-decodes submitted Ambisonic blocks. Multiple sends may target the same receiver.
+		</member>
+	</members>
+</class>

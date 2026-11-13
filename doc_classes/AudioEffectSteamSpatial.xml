@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioEffectSteamSpatial" inherits="AudioEffect" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Spatializes a point source to stereo using Steam Audio's built-in HRTF.
+	</brief_description>
+	<description>
+		Converts a mono point source into binaural stereo based on its listener-relative [member direction]. The current implementation folds Godot's stereo bus input to mono before spatialization, applies [member gain], and uses Steam Audio's built-in HRTF.
+		This is a render effect only. It does not locate a Godot listener or source, trace geometry, calculate propagation delay, or render reflections and reverb. [AudioStreamQPlayer3D] updates its parameters from Godot transforms. It can also be driven directly by another source of spatial parameters.
+		Place [AudioEffectSteamDirect] before this effect when direct-path filtering is required. Output is always a stereo binaural signal intended for headphones; it is not a loudspeaker-surround decoder.
+	</description>
+	<tutorials>
+		<link title="Steam Audio Binaural Effect">https://valvesoftware.github.io/steam-audio/doc/capi/binaural-effect.html</link>
+	</tutorials>
+	<methods>
+		<method name="set_source_parameters">
+			<return type="void" />
+			<param index="0" name="direction" type="Vector3" />
+			<param index="1" name="gain" type="float" />
+			<param index="2" name="spatial_blend" type="float" default="1.0" />
+			<description>
+				Updates [member direction], [member gain], and [member spatial_blend] together. This reduces main-thread property traffic when a source moves.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="direction" type="Vector3" setter="set_direction" getter="get_direction" default="Vector3(0, 0, -1)">
+			Unit vector in listener-local space pointing from the listener toward the source. Nonzero values are normalized automatically; a zero vector becomes [code]Vector3(0, 0, -1)[/code].
+		</member>
+		<member name="gain" type="float" setter="set_gain" getter="get_gain" default="1.0">
+			Nonnegative linear gain applied to the mono source immediately before HRTF rendering. This is an integration convenience and is not a field of Steam Audio's [code]IPLBinauralEffectParams[/code].
+		</member>
+		<member name="interpolation" type="int" setter="set_interpolation" getter="get_interpolation" enum="AudioEffectSteamSpatial.Interpolation" default="1">
+			HRTF measurement interpolation used when [member direction] falls between measured locations.
+		</member>
+		<member name="spatial_blend" type="float" setter="set_spatial_blend" getter="get_spatial_blend" default="1.0">
+			Blend between unspatialized mono and fully HRTF-spatialized output, clamped to [code]0.0[/code]–[code]1.0[/code]. Because this implementation first folds input to mono, [code]0.0[/code] does not preserve the original stereo image.
+		</member>
+	</members>
+	<constants>
+		<constant name="INTERPOLATION_NEAREST" value="0" enum="Interpolation">
+			Uses the nearest measured HRTF direction. This is the lower-cost option.
+		</constant>
+		<constant name="INTERPOLATION_BILINEAR" value="1" enum="Interpolation">
+			Interpolates between nearby HRTF measurements. This is smoother for wide-band material but costs more CPU.
+		</constant>
+	</constants>
+</class>

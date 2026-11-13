@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://egvbmkpm3sy0"]
+
+[ext_resource type="Script" path="res://addons/steam_spatial/audio_stream_q_player_3d.gd" id="1_qplayer"]
+[ext_resource type="PackedScene" uid="uid://v3l1wfvv8ukt" path="res://addons/steam_spatial/velocity_tracker_3d.tscn" id="2_velocity"]
+
+[node name="AudioStreamQPlayer3D" type="Node3D"]
+script = ExtResource("1_qplayer")
+
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." internal=2]
+playback_type = 1
+
+[node name="GodotAudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="." internal=2]
+playback_type = 1
+
+[node name="VelocityTracker3D" parent="." instance=ExtResource("2_velocity") internal=2]

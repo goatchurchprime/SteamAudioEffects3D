@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioEffectSteamReflectionHRTF" inherits="AudioEffect" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		HRTF-decodes submitted Ambisonic reflections and mixes them with the incoming dry stereo signal.
+	</brief_description>
+	<description>
+		Place this effect after [AudioEffectSteamSpatial]. It receives the point-HRTF dry stereo signal through the normal Godot effect chain, retrieves Ambisonic blocks submitted by one or more [AudioEffectSteamReflectionSend] resources, rotates the sound field using [member listener_orientation], decodes it binaurally, and adds the wet stereo result to the dry input.
+		The resource itself owns four dynamically sized float arrays, one for each first-order Ambisonic channel. This is why sends target this resource rather than an [AudioEffectSteamReflectionHRTFInstance]. The native [code]mix_in()[/code] entry point copy-adds first-order four-channel Steam Audio blocks directly into those arrays, without a sidecar state object or exposing multichannel data through Godot's stereo [AudioFrame] interface.
+	</description>
+	<tutorials>
+		<link title="Steam Audio Ambisonics Decode Effect">https://valvesoftware.github.io/steam-audio/doc/capi/ambisonics-decode-effect.html</link>
+	</tutorials>
+	<methods>
+		<method name="set_listener_parameters">
+			<return type="void" />
+			<param index="0" name="orientation" type="Basis" />
+			<param index="1" name="wet_gain" type="float" default="1.0" />
+			<description>
+				Updates [member listener_orientation] and [member wet_gain] together.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="listener_orientation" type="Basis" setter="set_listener_orientation" getter="get_listener_orientation" default="Basis(1, 0, 0, 0, 1, 0, 0, 0, 1)">
+			Absolute world orientation of the listener. The decoder rotates the world-aligned Ambisonic field into head-relative coordinates before HRTF rendering.
+		</member>
+		<member name="wet_gain" type="float" setter="set_wet_gain" getter="get_wet_gain" default="1.0">
+			Nonnegative linear gain applied to the decoded wet stereo signal before it is added to the ordinary input.
+		</member>
+	</members>
+</class>

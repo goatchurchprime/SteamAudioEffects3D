@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="AudioStreamEffects3D"
-run/main_scene="res://spatialization_verifier/spatialization_verifier.tscn"
+config/name="SteamAudioEffects3D"
+run/main_scene="uid://dolkr4i588ou"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://icon.svg"
 

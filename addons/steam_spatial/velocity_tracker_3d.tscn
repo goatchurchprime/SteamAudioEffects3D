@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://v3l1wfvv8ukt"]
 
-[ext_resource type="Script" uid="uid://cupb8dfl68jvc" path="res://addons/audio_player_by_effects/velocity_tracker_3d.gd" id="1_dn60q"]
+[ext_resource type="Script" uid="uid://cupb8dfl68jvc" path="res://addons/steam_spatial/velocity_tracker_3d.gd" id="1_dn60q"]
 
 [node name="VelocityTracker3D" type="Node3D" unique_id=1376812999]
 script = ExtResource("1_dn60q")

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioEffectSteamReflectionSendInstance" inherits="AudioEffectInstance" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Runtime processor for [AudioEffectSteamReflectionSend].
+	</brief_description>
+	<description>
+		Owns the stateful Steam Audio parametric reflection processor. Applications normally configure the corresponding effect resource instead of using this instance directly.
+	</description>
+	<methods>
+		<method name="is_ready" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns whether the native Steam Audio processor initialized successfully.
+			</description>
+		</method>
+	</methods>
+</class>

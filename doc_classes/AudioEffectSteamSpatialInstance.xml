@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioEffectSteamSpatialInstance" inherits="AudioEffectInstance" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Audio-thread processor created by [AudioEffectSteamSpatial].
+	</brief_description>
+	<description>
+		Internal processing instance. Games normally configure [AudioEffectSteamSpatial] rather than using this class directly.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="is_ready" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] when the Steam Audio context, HRTF, binaural effect, and audio buffers were created successfully.
+			</description>
+		</method>
+	</methods>
+</class>

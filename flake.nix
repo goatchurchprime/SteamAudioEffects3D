@@ -1,7 +1,7 @@
 {
   description = "AudioStreamEffects3D Steam Audio GDExtension";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/b6018f87da91d19d0ab4cf979885689b469cdd41";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/f4a03c008967841f2a0b3cb7c436fc6fc31671f6";
 
   outputs = { self, nixpkgs }:
     let
@@ -13,7 +13,7 @@
           cmake
           flatbuffers
           gcc
-          godot_4_6
+          godot_4
           libmysofa
           ninja
           pffft

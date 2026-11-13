@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="AudioEffectSteamDirect" inherits="AudioEffect" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Applies Steam Audio direct-path attenuation and filtering to a Godot audio bus.
+	</brief_description>
+	<description>
+		Renders the audible consequences of values already calculated for the direct path between one source and the listener. It can combine distance attenuation, three-band air absorption, source directivity, occlusion, and material transmission in one processing stage.
+		This class does not inspect Godot geometry and does not run Steam Audio's simulator. A game may calculate the parameters with Godot physics, another acoustic model, or Steam Audio's [code]IPLSimulator[/code], then update this resource from the main or simulation thread. Parameter values are copied to the audio processor through atomic storage.
+		Steam Audio's [code]IPLSimulationOutputs.direct[/code] has the same conceptual fields as this resource. Reflection/reverb and pathing outputs are separate signal paths and cannot be rendered by this direct effect.
+		Place this effect before [AudioEffectSteamSpatial] when using both.
+	</description>
+	<tutorials>
+		<link title="Steam Audio Direct Effect">https://valvesoftware.github.io/steam-audio/doc/capi/direct-effect.html</link>
+		<link title="Steam Audio Simulation">https://valvesoftware.github.io/steam-audio/doc/capi/simulation.html</link>
+	</tutorials>
+	<members>
+		<member name="air_absorption" type="Vector3" setter="set_air_absorption" getter="get_air_absorption" default="Vector3(1, 1, 1)">
+			Low-, mid-, and high-frequency gain coefficients, respectively. Each component is clamped to [code]0.0[/code]–[code]1.0[/code]. A value of [code]Vector3(1, 1, 1)[/code] does not absorb any band.
+		</member>
+		<member name="air_absorption_enabled" type="bool" setter="set_air_absorption_enabled" getter="is_air_absorption_enabled" default="true">
+			If [code]true[/code], applies the three-band [member air_absorption] filter.
+		</member>
+		<member name="directivity" type="float" setter="set_directivity" getter="get_directivity" default="1.0">
+			Broadband gain for source directivity, clamped to [code]0.0[/code]–[code]1.0[/code]. This is the evaluated directivity term, not a description of the source's directivity pattern.
+		</member>
+		<member name="directivity_enabled" type="bool" setter="set_directivity_enabled" getter="is_directivity_enabled" default="true">
+			If [code]true[/code], applies [member directivity].
+		</member>
+		<member name="distance_attenuation" type="float" setter="set_distance_attenuation" getter="get_distance_attenuation" default="1.0">
+			Frequency-independent distance gain, clamped to [code]0.0[/code]–[code]1.0[/code]. This effect consumes a calculated gain; it does not receive or measure source distance.
+		</member>
+		<member name="distance_attenuation_enabled" type="bool" setter="set_distance_attenuation_enabled" getter="is_distance_attenuation_enabled" default="true">
+			If [code]true[/code], applies [member distance_attenuation].
+		</member>
+		<member name="occlusion" type="float" setter="set_occlusion" getter="get_occlusion" default="1.0">
+			Direct-path visibility factor, clamped to [code]0.0[/code]–[code]1.0[/code]. [code]0.0[/code] is fully occluded and [code]1.0[/code] is unoccluded.
+		</member>
+		<member name="occlusion_enabled" type="bool" setter="set_occlusion_enabled" getter="is_occlusion_enabled" default="false">
+			If [code]true[/code], applies [member occlusion]. No ray cast is performed by the effect itself.
+		</member>
+		<member name="transmission" type="Vector3" setter="set_transmission" getter="get_transmission" default="Vector3(1, 1, 1)">
+			Low-, mid-, and high-frequency transmission coefficients for the occluded portion of the sound. Each component is clamped to [code]0.0[/code]–[code]1.0[/code].
+		</member>
+		<member name="transmission_enabled" type="bool" setter="set_transmission_enabled" getter="is_transmission_enabled" default="false">
+			If [code]true[/code], applies material transmission together with occlusion. The caller is responsible for deriving coefficients from intersected geometry and acoustic materials.
+		</member>
+		<member name="transmission_type" type="int" setter="set_transmission_type" getter="get_transmission_type" enum="AudioEffectSteamDirect.TransmissionType" default="1">
+			Selects frequency-independent or three-band frequency-dependent transmission.
+		</member>
+	</members>
+	<constants>
+		<constant name="TRANSMISSION_FREQUENCY_INDEPENDENT" value="0" enum="TransmissionType">
+			Applies transmission without frequency-dependent filtering.
+		</constant>
+		<constant name="TRANSMISSION_FREQUENCY_DEPENDENT" value="1" enum="TransmissionType">
+			Applies the low-, mid-, and high-frequency coefficients in [member transmission].
+		</constant>
+	</constants>
+</class>

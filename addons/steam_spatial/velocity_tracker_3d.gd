@@ -1,6 +1,6 @@
 extends Node3D
 
-# Needs to be a child of Camera3D, AudioListener3D, or AudioPlayerByEffects3D
+# Needs to be a child of Camera3D, AudioListener3D, or AudioStreamQPlayer3D.
 
 class PositionHistory:
 	var frame : int = 0;
@@ -15,7 +15,6 @@ func _init():
 	position_history.resize(4)
 
 func _ready():
-	print(get_parent().get_name())
 	_update_dopper_tracking()
 
 func _update_dopper_tracking():

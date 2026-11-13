@@ -4,3 +4,4 @@ addons/steam_spatial/bin/
 *.os
 .sconsign.dblite
 compile_commands.json
+src/gen/

@@ -1,0 +1,55 @@
+extends SceneTree
+
+func _initialize() -> void:
+	call_deferred("_run")
+
+func _run() -> void:
+	var packed := load("res://listening_test.tscn") as PackedScene
+	assert(packed != null, "Listening test scene must load")
+	var demo := packed.instantiate()
+	root.add_child(demo)
+	await process_frame
+	await physics_frame
+
+	var listener := demo.get_node("Listener") as AudioListener3D
+	var native_player := demo.get_node("SourceRig/NativeAudioStreamPlayer3D") as AudioStreamPlayer3D
+	var quality_player := demo.get_node("SourceRig/AudioStreamQPlayer3D") as AudioStreamQPlayer3D
+	assert(listener.is_current(), "Listening test must make its explicit listener current")
+	assert(native_player.stream != null and native_player.stream == quality_player.stream,
+			"Both renderers must receive the identical audition stream")
+	assert(not quality_player.reflections_enabled, "The default localization trial must begin dry")
+
+	quality_player.apply_reflection_preset(AudioStreamQPlayer3D.ReflectionPreset.LARGE_HALL)
+	await physics_frame
+	assert(quality_player.reflections_enabled)
+	assert(quality_player.reflection_reverb_times == Vector3(2.2, 1.8, 1.3))
+	assert(quality_player.steam_reflection_send.enabled)
+	assert(quality_player.steam_reflection_send.reverb_times == Vector3(2.2, 1.8, 1.3))
+
+	demo.call("_randomize_hidden_source")
+	assert(not demo.get_node("SourceRig/Marker").visible,
+			"A blind trial must hide its source marker")
+	demo.call("_toggle_playback")
+	await process_frame
+	assert(quality_player.is_playing(), "QPlayer must be the default audition backend")
+	demo.call("_cycle_backend")
+	await process_frame
+	assert(native_player.is_playing() and not quality_player.is_playing(),
+			"Backend switching must remain exclusive")
+	assert(not quality_player.reflections_enabled,
+			"The inactive QPlayer must not leave a reflection tail under native output")
+
+	demo.call("_stop_players")
+	native_player.stream = null
+	quality_player.stream = null
+	await create_timer(0.15).timeout
+	demo.queue_free()
+	await process_frame
+	listener = null
+	native_player = null
+	quality_player = null
+	demo = null
+	packed = null
+	await process_frame
+	print("listening test smoke passed")
+	quit()

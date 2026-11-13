@@ -14,7 +14,9 @@ for required in PFFFT_INCLUDE_DIR PFFFT_LIBRARY MYSOFA_INCLUDE_DIR MYSOFA_LIBRAR
     fi
 done
 
-cmake -S "$steam_source" -B "$steam_build" -G Ninja \
+# Recreate CMake's cache so switching the pinned Nixpkgs revision cannot leave
+# an old compiler or Nix-store RPATH embedded in libphonon.so.
+cmake --fresh -S "$steam_source" -B "$steam_build" -G Ninja \
     -DBUILD_SHARED_LIBS=ON \
     -DSTEAMAUDIO_ENABLE_IPP=OFF \
     -DSTEAMAUDIO_ENABLE_EMBREE=OFF \

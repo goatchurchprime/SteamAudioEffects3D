@@ -1,26 +1,40 @@
 [gd_resource type="AudioBusLayout" format=3 uid="uid://cm18pdhrdpjhf"]
 
-[sub_resource type="AudioEffectHighShelfFilter" id="AudioEffectHighShelfFilter_j3pel"]
-resource_name = "Distance High Shelf"
-cutoff_hz = 5000.0
-resonance = 1.0
+[sub_resource type="AudioEffectSteamReflectionHRTF" id="AudioEffectSteamReflectionHRTF_j3pel"]
+resource_name = "Reflection HRTF Return"
 
-[sub_resource type="AudioEffectAmplify" id="AudioEffectAmplify_g28q7"]
-resource_name = "Spatial Gain"
+[sub_resource type="AudioEffectSteamReflectionSend" id="AudioEffectSteamReflectionSend_j3pel"]
+send_gain = 0.25118864
+target = SubResource("AudioEffectSteamReflectionHRTF_j3pel")
+resource_name = "Reflection Send"
 
-[sub_resource type="AudioEffectPanner" id="AudioEffectPanner_n8wo2"]
-resource_name = "Spatial Panner"
+[sub_resource type="AudioEffectSteamDirect" id="AudioEffectSteamDirect_j3pel"]
+air_absorption = Vector3(0.999292, 0.9939979, 0.9375816)
+resource_name = "Direct Path"
+
+[sub_resource type="AudioEffectSteamSpatial" id="AudioEffectSteamSpatial_j3pel"]
+direction = Vector3(-0.92179334, 0, 0.38768175)
+resource_name = "HRTF Spatializer"
 
 [resource]
-bus/1/name = &"PlayerEffectBus_Editor"
+bus/0/volume_db = 0.46499825
+bus/1/name = &"QPlayerBus_Editor"
 bus/1/solo = false
 bus/1/mute = false
 bus/1/bypass_fx = false
 bus/1/volume_db = 0.0
 bus/1/send = &"Master"
-bus/1/effect/0/effect = SubResource("AudioEffectHighShelfFilter_j3pel")
+bus/1/effect/0/effect = SubResource("AudioEffectSteamReflectionSend_j3pel")
 bus/1/effect/0/enabled = true
-bus/1/effect/1/effect = SubResource("AudioEffectAmplify_g28q7")
+bus/1/effect/1/effect = SubResource("AudioEffectSteamDirect_j3pel")
 bus/1/effect/1/enabled = true
-bus/1/effect/2/effect = SubResource("AudioEffectPanner_n8wo2")
+bus/1/effect/2/effect = SubResource("AudioEffectSteamSpatial_j3pel")
 bus/1/effect/2/enabled = true
+bus/1/effect/3/effect = SubResource("AudioEffectSteamReflectionHRTF_j3pel")
+bus/1/effect/3/enabled = true
+bus/2/name = &"NativeSpatial"
+bus/2/solo = false
+bus/2/mute = false
+bus/2/bypass_fx = false
+bus/2/volume_db = 0.0
+bus/2/send = &"Master"
