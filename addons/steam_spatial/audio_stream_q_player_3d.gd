@@ -46,6 +46,8 @@ signal finished
 
 const CMP_EPSILON := 0.00001
 const SPEED_OF_SOUND := 343.0
+const SPATIAL_BUS_CONSTRUCT_RUNTIME := &"Construct Runtime"
+const SPATIAL_BUS_CONSTRUCT_NOW := &"Construct Now"
 
 var _stream: AudioStream
 var _playing_requested := false
@@ -54,6 +56,9 @@ var _max_polyphony := 1
 var _playback_type: AudioServer.PlaybackType = AudioServer.PLAYBACK_TYPE_STREAM
 var _pitch_scale := 1.0
 var _active_backend: SpatialBackend = SpatialBackend.GODOT_NATIVE
+var _spatial_effect_bus: StringName = SPATIAL_BUS_CONSTRUCT_RUNTIME
+var _bus_hint_cache := ""
+var _native_audio_bus_hint := -1
 
 @export_category("Renderer")
 ## Requested spatial renderer. [constant SpatialBackend.AUTO] is recommended
@@ -106,6 +111,23 @@ var _active_backend: SpatialBackend = SpatialBackend.GODOT_NATIVE
 		for player in [_get_audio_player(), _get_godot_player()]:
 			if player != null:
 				player.max_polyphony = _max_polyphony
+## Playback pitch multiplier. Doppler is applied on top of this value.
+@export var pitch_scale: float = 1.0:
+	get:
+		return _pitch_scale
+	set(value):
+		_pitch_scale = maxf(value, 0.0001)
+		for player in [_get_audio_player(), _get_godot_player()]:
+			if player != null:
+				player.pitch_scale = _pitch_scale
+## Source volume in decibels, applied before HRTF rendering.
+@export var volume_db := 0.0
+## Source volume as a linear value.
+var volume_linear: float:
+	get:
+		return db_to_linear(volume_db)
+	set(value):
+		volume_db = linear_to_db(value)
 ## Compatibility property. This player always uses [constant AudioServer.PLAYBACK_TYPE_STREAM]
 ## because Sample playback does not pass through Godot audio buses.
 @export var playback_type: AudioServer.PlaybackType:
@@ -123,6 +145,29 @@ var _active_backend: SpatialBackend = SpatialBackend.GODOT_NATIVE
 		var godot_player := _get_godot_player()
 		if godot_player != null:
 			godot_player.playback_type = value
+## Destination bus for the output of this player's private Steam processing bus.
+@export var bus: StringName = &"Master":
+	set(value):
+		bus = value
+		if effect_bus_index >= 0:
+			AudioServer.set_bus_send(effect_bus_index, value)
+		else:
+			var player := _get_audio_player()
+			if player != null:
+				player.bus = value
+## Selects where this player's spatial effect chain lives. [code]Construct Runtime[/code]
+## creates a private bus when the scene runs and removes it afterwards.
+## [code]Construct Now[/code] creates and assigns that same uniquely named bus in
+## the editor, allowing it to be inspected and deliberately saved in the audio
+## bus layout. An existing bus can also be selected if it already contains the
+## four Steam spatial effects in their required order.
+@export_custom(PROPERTY_HINT_ENUM, "Construct Runtime,Construct Now") var spatial_effect_bus: StringName:
+	get:
+		return _spatial_effect_bus
+	set(value):
+		_spatial_effect_bus = value if value != &"" else SPATIAL_BUS_CONSTRUCT_RUNTIME
+		if is_inside_tree() and _active_backend == SpatialBackend.STEAM_AUDIO:
+			_apply_spatial_effect_bus_selection()
 
 @export_category("Spatialization")
 ## Distance attenuation curve applied to the direct sound path.
@@ -133,25 +178,8 @@ var _active_backend: SpatialBackend = SpatialBackend.GODOT_NATIVE
 @export var max_distance := 0.0
 ## Maximum source gain in decibels.
 @export var max_db := 3.0
-## Source volume in decibels, applied before HRTF rendering.
-@export var volume_db := 0.0
-## Source volume as a linear value.
-var volume_linear: float:
-	get:
-		return db_to_linear(volume_db)
-	set(value):
-		volume_db = linear_to_db(value)
 ## Multiplies [code]audio/general/3d_panning_strength[/code] to control HRTF spatial blend.
 @export_range(0.0, 3.0, 0.01) var panning_strength := 1.0
-## Playback pitch multiplier. Doppler is applied on top of this value.
-@export var pitch_scale: float = 1.0:
-	get:
-		return _pitch_scale
-	set(value):
-		_pitch_scale = maxf(value, 0.0001)
-		for player in [_get_audio_player(), _get_godot_player()]:
-			if player != null:
-				player.pitch_scale = _pitch_scale
 ## Selects whether Doppler tracking is disabled or evaluated. Updates currently occur on physics ticks.
 @export var doppler_tracking: AudioStreamPlayer3D.DopplerTracking = AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED
 
@@ -244,25 +272,9 @@ func _push_reflection_parameters() -> void:
 ## Compatibility placeholder. Steam's three-band air absorption replaces Godot's attenuation filter.
 @export_range(-80.0, 0.0, 0.1, "suffix:dB") var attenuation_filter_db := -24.0
 
-@export_group("Routing")
-## Destination bus for the output of this player's private Steam processing bus.
-@export var bus: StringName = &"Master":
-	set(value):
-		bus = value
-		if effect_bus_index >= 0:
-			AudioServer.set_bus_send(effect_bus_index, value)
-## Compatibility property reserved for future [Area3D] bus and reverb routing.
-## It is currently stored but not applied.
-@export_flags_3d_physics var area_mask := 1
-
-@export_group("Bus Debugging")
-## Uses an existing bus containing Reflection Send, Direct Path, point HRTF, and
-## Reflection HRTF Return effects instead of creating one.
-## Intended for editor inspection and controlled integration tests.
-@export var existing_effect_bus: StringName = &""
-
 var effect_bus_name: StringName = &""
 var effect_bus_index := -1
+var owns_effect_bus := false
 var steam_direct: AudioEffect
 var steam_hrtf: AudioEffect
 var steam_reflection_send: AudioEffect
@@ -308,14 +320,8 @@ func _ready() -> void:
 	godot_player.playback_type = _playback_type
 	_configure_godot_player()
 
-	if Engine.is_editor_hint():
-		if _active_backend == SpatialBackend.STEAM_AUDIO and AudioServer.get_bus_index(&"QPlayerBus_Editor") >= 0:
-			_attach_effect_bus(&"QPlayerBus_Editor")
-	elif _active_backend == SpatialBackend.STEAM_AUDIO:
-		if existing_effect_bus != &"":
-			_attach_effect_bus(existing_effect_bus)
-		else:
-			_create_runtime_effect_bus()
+	if _active_backend == SpatialBackend.STEAM_AUDIO:
+		_apply_spatial_effect_bus_selection()
 
 	# Bus and playback type are selected when play_basic() creates the playback;
 	# changing either afterwards does not migrate an already-playing stream.
@@ -413,7 +419,9 @@ func _on_stream_finished() -> void:
 func begin_editor_preview(preview_bus: StringName) -> void:
 	if not Engine.is_editor_hint():
 		return
-	var target_bus := existing_effect_bus if existing_effect_bus != &"" else preview_bus
+	var target_bus := _spatial_effect_bus
+	if target_bus == SPATIAL_BUS_CONSTRUCT_RUNTIME or target_bus == SPATIAL_BUS_CONSTRUCT_NOW:
+		target_bus = preview_bus
 	var target_index := AudioServer.get_bus_index(target_bus)
 	var player := _get_audio_player()
 	if target_index < 0:
@@ -434,12 +442,84 @@ func end_editor_preview() -> void:
 	steam_hrtf = null
 	steam_reflection_send = null
 	steam_reflection_hrtf = null
+	notify_property_list_changed()
+
+func _apply_spatial_effect_bus_selection() -> void:
+	if not _steam_effects_available():
+		return
+	_ensure_internal_nodes()
+	var player := _get_audio_player()
+	if player == null:
+		return
+	var was_playing := player.playing
+	var playback_position := player.get_playback_position() if was_playing else 0.0
+	if was_playing:
+		player.stop()
+
+	# A generated bus belongs to this player when its instance-numbered name is
+	# the name this player would generate now. Existing named buses are external.
+	var remove_previous_bus := owns_effect_bus
+	if (
+			Engine.is_editor_hint()
+			and _effect_bus_belongs_to_player(effect_bus_name)
+			and _spatial_effect_bus != effect_bus_name
+	):
+		remove_previous_bus = true
+	_clear_effect_bus(remove_previous_bus)
+	match _spatial_effect_bus:
+		SPATIAL_BUS_CONSTRUCT_RUNTIME:
+			if not Engine.is_editor_hint():
+				_create_runtime_effect_bus()
+		SPATIAL_BUS_CONSTRUCT_NOW:
+			if Engine.is_editor_hint():
+				var generated_name := _generated_effect_bus_name()
+				if AudioServer.get_bus_index(generated_name) >= 0:
+					_attach_effect_bus(generated_name)
+				else:
+					_create_effect_bus(generated_name)
+				# This is an authored bus: keep it in the layout when this node exits.
+				owns_effect_bus = false
+				_spatial_effect_bus = generated_name
+				notify_property_list_changed()
+				if EditorInterface.get_edited_scene_root() != null:
+					EditorInterface.mark_scene_as_unsaved()
+			else:
+				_create_runtime_effect_bus()
+		_:
+			_attach_effect_bus(_spatial_effect_bus)
+
+	if was_playing:
+		player.play(playback_position)
+
+func _clear_effect_bus(remove_owned: bool) -> void:
+	var old_name := effect_bus_name
+	var player := _get_audio_player()
+	if player != null:
+		player.bus = bus
+	effect_bus_name = &""
+	effect_bus_index = -1
+	steam_reflection_send = null
+	steam_direct = null
+	steam_hrtf = null
+	steam_reflection_hrtf = null
+	owns_effect_bus = false
+	if remove_owned and old_name != &"":
+		var old_index := AudioServer.get_bus_index(old_name)
+		if old_index >= 0:
+			AudioServer.remove_bus(old_index)
+	notify_property_list_changed()
 
 func _attach_effect_bus(bus_name: StringName) -> void:
+	owns_effect_bus = false
 	effect_bus_name = bus_name
 	effect_bus_index = AudioServer.get_bus_index(bus_name)
+	steam_reflection_send = null
+	steam_direct = null
+	steam_hrtf = null
+	steam_reflection_hrtf = null
 	if effect_bus_index < 0:
 		push_warning("Steam spatial effect bus '%s' does not exist" % bus_name)
+		notify_property_list_changed()
 		return
 	var player := _get_audio_player()
 	if player != null:
@@ -459,12 +539,37 @@ func _attach_effect_bus(bus_name: StringName) -> void:
 	else:
 		steam_reflection_send.set("target", steam_reflection_hrtf)
 		_push_reflection_parameters()
+	notify_property_list_changed()
+
+func _generated_effect_bus_name() -> StringName:
+	if Engine.is_editor_hint() and is_inside_tree():
+		var scene_root: Node = self
+		while scene_root.get_parent() != null and not (scene_root.get_parent() is Viewport):
+			scene_root = scene_root.get_parent()
+		var scene_path := scene_root.scene_file_path
+		if scene_path != "":
+			var stable_identity := "%s::%s" % [scene_path, scene_root.get_path_to(self)]
+			return StringName("QPlayerBus_%s" % stable_identity.sha256_text().substr(0, 12))
+	var player := _get_audio_player()
+	return StringName("QPlayerBus_%d" % player.get_instance_id()) if player != null else &"QPlayerBus"
+
+func _effect_bus_belongs_to_player(bus_name: StringName) -> bool:
+	if bus_name == _generated_effect_bus_name():
+		return true
+	# Recognize a bus made by the earlier instance-number naming during this
+	# editor session, so switching to the stable scheme does not orphan it.
+	var player := _get_audio_player()
+	return player != null and bus_name == StringName("QPlayerBus_%d" % player.get_instance_id())
 
 func _create_runtime_effect_bus() -> void:
+	_create_effect_bus(_generated_effect_bus_name())
+
+func _create_effect_bus(bus_name: StringName) -> void:
 	var player := _get_audio_player()
 	if player == null:
 		return
-	effect_bus_name = StringName("QPlayerBus_%d" % player.get_instance_id())
+	owns_effect_bus = true
+	effect_bus_name = bus_name
 	AudioServer.add_bus()
 	effect_bus_index = AudioServer.bus_count - 1
 	AudioServer.set_bus_name(effect_bus_index, effect_bus_name)
@@ -488,9 +593,75 @@ func _create_runtime_effect_bus() -> void:
 	AudioServer.add_bus_effect(effect_bus_index, steam_hrtf)
 	AudioServer.add_bus_effect(effect_bus_index, steam_reflection_hrtf)
 	_push_reflection_parameters()
+	notify_property_list_changed()
+	if Engine.is_editor_hint():
+		# add_bus() refreshes the Audio dock immediately, before this function has
+		# populated the new bus. add_bus_effect() has no public change signal;
+		# Godot's own dock calls its private _update_bus() after adding an effect.
+		# Re-emit the public layout signal on the next idle step so the dock rebuilds
+		# once, after the complete four-effect chain is present.
+		AudioServer.call_deferred("emit_signal", &"bus_layout_changed")
+
+func _bus_names_hint(include_construction_choices: bool) -> String:
+	var names := PackedStringArray()
+	if include_construction_choices:
+		names.append(String(SPATIAL_BUS_CONSTRUCT_RUNTIME))
+		names.append(String(SPATIAL_BUS_CONSTRUCT_NOW))
+	for bus_index in AudioServer.bus_count:
+		names.append(String(AudioServer.get_bus_name(bus_index)))
+	return ",".join(names)
+
+func _validate_property(property: Dictionary) -> void:
+	if property.name == "bus":
+		property.hint = _get_native_audio_bus_hint()
+		property.hint_string = ""
+	elif property.name == "spatial_effect_bus":
+		property.hint = PROPERTY_HINT_ENUM
+		property.hint_string = _bus_names_hint(true)
+
+func _get_native_audio_bus_hint() -> int:
+	if _native_audio_bus_hint >= 0:
+		return _native_audio_bus_hint
+	var native_player := AudioStreamPlayer3D.new()
+	for property in native_player.get_property_list():
+		if property.name == &"bus":
+			_native_audio_bus_hint = property.hint
+			break
+	native_player.free()
+	return _native_audio_bus_hint
+
+func _get_property_list() -> Array[Dictionary]:
+	if steam_reflection_send == null or steam_direct == null or steam_hrtf == null or steam_reflection_hrtf == null:
+		return []
+	var properties: Array[Dictionary] = [{
+		"name": "Spatial Effect Bus Effects",
+		"type": TYPE_NIL,
+		"usage": PROPERTY_USAGE_GROUP,
+	}]
+	for property_name in [&"reflection_send_effect", &"direct_path_effect", &"hrtf_spatializer_effect", &"reflection_hrtf_effect"]:
+		properties.append({
+			"name": property_name,
+			"type": TYPE_OBJECT,
+			"hint": PROPERTY_HINT_RESOURCE_TYPE,
+			"hint_string": "AudioEffect",
+			"usage": PROPERTY_USAGE_EDITOR | PROPERTY_USAGE_READ_ONLY,
+		})
+	return properties
+
+func _get(property: StringName) -> Variant:
+	match property:
+		&"reflection_send_effect":
+			return steam_reflection_send
+		&"direct_path_effect":
+			return steam_direct
+		&"hrtf_spatializer_effect":
+			return steam_hrtf
+		&"reflection_hrtf_effect":
+			return steam_reflection_hrtf
+	return null
 
 func _exit_tree() -> void:
-	if Engine.is_editor_hint() or effect_bus_name == &"":
+	if Engine.is_editor_hint() or not owns_effect_bus or effect_bus_name == &"":
 		return
 	var current_index := AudioServer.get_bus_index(effect_bus_name)
 	if current_index >= 0:
@@ -615,7 +786,6 @@ func _configure_godot_player() -> void:
 	player.attenuation_filter_cutoff_hz = attenuation_filter_cutoff_hz
 	player.attenuation_filter_db = attenuation_filter_db
 	player.bus = bus
-	player.area_mask = area_mask
 
 func _update_doppler(listener: Node3D, local_position: Vector3, weight: float) -> void:
 	var actual_pitch := _pitch_scale
@@ -637,6 +807,11 @@ func _update_doppler(listener: Node3D, local_position: Vector3, weight: float) -
 		player.pitch_scale = actual_pitch
 
 func _physics_process(_delta: float) -> void:
+	if Engine.is_editor_hint():
+		var current_bus_hint := _bus_names_hint(true)
+		if current_bus_hint != _bus_hint_cache:
+			_bus_hint_cache = current_bus_hint
+			notify_property_list_changed()
 	var player := _get_active_player()
 	if Engine.is_editor_hint() and not _is_in_active_editor_scene():
 		if player != null and player.playing:

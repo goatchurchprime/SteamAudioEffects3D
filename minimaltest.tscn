@@ -10,8 +10,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7349718, 0, -1.6403158)
 stream = ExtResource("2_audio")
 max_polyphony = 1
 playback_type = 1
-pitch_scale = 1.0
-existing_effect_bus = &"QPlayerBus_Editor"
+spatial_effect_bus = &"Construct Runtime"
 
 [node name="AudioStreamPlayer3D" type="AudioStreamPlayer3D" parent="." unique_id=745416927]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.4696543, 0, -1.6762239)

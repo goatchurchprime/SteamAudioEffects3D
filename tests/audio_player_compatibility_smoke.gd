@@ -12,7 +12,6 @@ func _run() -> void:
 	player.max_polyphony = 3
 	player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	player.volume_linear = 0.5
-	player.area_mask = 7
 	root.add_child(player)
 	await process_frame
 	var available_properties := {}
@@ -21,7 +20,7 @@ func _run() -> void:
 	for property_name in [
 		"stream", "attenuation_model", "volume_db", "volume_linear", "unit_size", "max_db",
 		"pitch_scale", "playing", "autoplay", "stream_paused", "max_distance", "max_polyphony",
-		"panning_strength", "bus", "area_mask", "playback_type", "emission_angle_enabled",
+		"panning_strength", "bus", "playback_type", "emission_angle_enabled",
 		"emission_angle_degrees", "emission_angle_filter_attenuation_db",
 		"attenuation_filter_cutoff_hz", "attenuation_filter_db", "doppler_tracking",
 		"reflection_preset", "reflections_enabled", "reflection_send_db",
@@ -37,7 +36,6 @@ func _run() -> void:
 	assert(player.playback_type == AudioServer.PLAYBACK_TYPE_STREAM, "Effect-based playback must reject the out-of-engine sample path")
 	assert(internal_player.playback_type == AudioServer.PLAYBACK_TYPE_STREAM, "The private player must remain in Godot's stream mixer")
 	assert(is_equal_approx(player.volume_db, linear_to_db(0.5)), "volume_linear must alias volume_db")
-	assert(player.area_mask == 7, "Compatibility-only properties must remain assignable")
 	player.apply_reflection_preset(player.ReflectionPreset.STONE_TUNNEL)
 	assert(player.reflections_enabled)
 	assert(player.reflection_reverb_times == Vector3(3.2, 2.7, 2.0))

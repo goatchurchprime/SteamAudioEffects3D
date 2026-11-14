@@ -23,7 +23,7 @@ what it offers—a higher-quality spatial audio player—without exposing its im
 `play()`, `seek()`, `stop()`, playback queries, and the `finished` signal. It remains a `Node3D`, so strict
 `AudioStreamPlayer3D` type annotations are not interchangeable.
 
-Each player owns a private bus with these visible effects:
+Each player uses a spatial effect bus with these visible effects:
 
 1. Reflection Send: pass-through dry audio plus an optional Steam parametric-reverb submission.
 2. Steam Audio Direct Path: distance gain, physical three-band air absorption, and source directivity.
@@ -93,6 +93,13 @@ Open `ineditordemo.tscn`, select its `Main` root, and click **Toggle A/B Preview
 or listener. This same two-player arrangement is the recommended basis for a VR A/B test: give both players the same
 stream and transform, and play only the selected implementation. Runtime replacement of existing scene nodes is
 intentionally avoided because it would invalidate typed references and can change signal and ownership semantics.
+
+For an ordinary player, `bus` selects the chain's output destination and
+`spatial_effect_bus` selects how the intermediate chain is supplied. Choose
+**Construct Runtime** for an automatically owned temporary bus, **Construct
+Now** to create and assign an inspectable bus in the current editor layout, or
+select an already-authored bus. Attached chains also appear as four expandable,
+read-only live effect resources in the player Inspector.
 
 The Steam effects size their processing buffers from the `frame_count` supplied by Godot and rebuild their Steam
 Audio processors if that block size changes. The HRTF path folds stereo input to one mono point source. It covers

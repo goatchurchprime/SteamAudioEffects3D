@@ -34,4 +34,4 @@ reflection_preset = 5
 reflections_enabled = true
 reflection_reverb_times = Vector3(2.2, 1.8, 1.3)
 reflection_wet_db = -4.0
-existing_effect_bus = &"QPlayerBus_Editor"
+spatial_effect_bus = &"QPlayerBus_Editor"

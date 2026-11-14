@@ -10,7 +10,7 @@ func _run() -> void:
 	root.add_child(demo)
 	await process_frame
 
-	assert(AudioServer.bus_count == 3, "The editor demo should begin with Master and its two saved inspection buses")
+	assert(AudioServer.bus_count == 3, "The editor demo should begin with Master and its two saved preview buses")
 	var private_bus_index := AudioServer.get_bus_index(&"QPlayerBus_Editor")
 	var native_bus_index := AudioServer.get_bus_index(&"NativeSpatial")
 	assert(private_bus_index >= 0)
@@ -93,7 +93,7 @@ func _run() -> void:
 
 	demo.preview_in_editor = false
 	await process_frame
-	assert(AudioServer.bus_count == 3, "Stopping preview must retain the authored inspection buses")
+	assert(AudioServer.bus_count == 3, "Stopping preview must retain the authored preview buses")
 	assert(AudioServer.get_bus_name(0) == &"Master")
 
 	# Closing an edited scene while preview is active must perform the same cleanup.

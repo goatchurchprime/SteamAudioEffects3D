@@ -5,7 +5,7 @@
 ordinary scene and gameplay code needs as little change as possible.
 
 It is not a subclass of `AudioStreamPlayer3D`. It is a `Node3D` scene containing
-an `AudioStreamPlayer`, a velocity tracker, and a private processing bus. Code
+an `AudioStreamPlayer`, a velocity tracker, and a spatial processing bus. Code
 typed specifically as `AudioStreamPlayer3D`, engine APIs that require that exact
 class, and `is AudioStreamPlayer3D` checks must be changed.
 
@@ -19,6 +19,7 @@ class, and `is AudioStreamPlayer3D` checks must be changed.
 | `volume_db`, `volume_linear`, `pitch_scale` | Compatible | Volume is applied before HRTF rendering. |
 | `max_polyphony` | Compatible | All voices share the node's position and one effect chain. |
 | `bus` | Functionally compatible | Selects the destination of the private processing bus, not the internal player's immediate source bus. |
+| `spatial_effect_bus` | Addon extension | Chooses an existing four-effect bus, constructs a private one at runtime, or constructs an inspectable authored bus immediately in the editor. |
 | `playback_type` | Name-compatible only | Always forced to Stream because Sample playback bypasses Godot bus effects. |
 | `attenuation_model`, `unit_size` | Mostly compatible | Evaluated by the addon and supplied to Steam Direct. The current logarithmic curve needs closer parity testing. |
 | `max_distance` | Audible behavior compatible | Fades to silence, but currently does not stop source mixing to save CPU. |
@@ -26,7 +27,6 @@ class, and `is AudioStreamPlayer3D` checks must be changed.
 | emission-angle properties | Functionally compatible | Applied as broadband directivity gain rather than Godot's attenuation filter. |
 | `doppler_tracking` | Partially compatible | Disabled versus enabled is respected, but Idle and Physics modes currently both update on physics ticks. Listener motion needs the included `VelocityTracker3D`. |
 | attenuation-filter properties | Stored compatibility placeholders | Steam's three-band physical air absorption replaces Godot's single cutoff/attenuation filter. These two values currently do not change DSP. |
-| `area_mask` | Stored compatibility placeholder | `Area3D` bus redirection and area reverb are not implemented yet. |
 
 ## Diffuse reflection presets
 
@@ -71,11 +71,37 @@ with `AudioStreamQPlayer3D`, `Node3D`, or an untyped reference as appropriate.
 The two classes cannot be transparently exchanged where a method argument,
 exported property, or engine subsystem explicitly requires `AudioStreamPlayer3D`.
 
-Avoid creating and destroying large numbers of these nodes every frame. Each
-runtime node creates a private Godot bus and four native effect processors. For
+Avoid creating and destroying large numbers of these nodes every frame. With
+**Construct Runtime**, each runtime node creates a private Godot bus and four
+native effect processors. For
 long-lived world sounds and VoIP talkers this makes ownership and parameter
 isolation simple; highly transient one-shot sounds will eventually benefit from
 pooling.
+
+## Spatial effect bus routing
+
+`bus` and `spatial_effect_bus` are bus-name dropdowns populated from the active
+Godot audio layout. `bus` is the final destination, matching the position of the
+native player's bus field in the Inspector. `spatial_effect_bus` controls the
+intermediate four-effect chain:
+
+- **Construct Runtime** leaves the editor layout untouched, creates a uniquely
+  named `QPlayerBus_<instance id>` when the game runs, and removes it with the
+  player.
+- **Construct Now** creates a uniquely named bus immediately, assigns it to
+  the node, and leaves it in the audio layout so it can be inspected and saved.
+  Its ID is derived from the saved scene path and node path, so ownership can be
+  recognized after reopening the scene. Selecting another spatial effect bus
+  removes the generated bus. Buses selected from the existing-bus list are
+  never deleted by the player. Unsaved scenes fall back to a transient instance
+  ID until they have a stable path.
+- Selecting a named bus attaches the player to an already-authored effect chain.
+
+When a valid chain is attached, the Inspector adds an expandable **Spatial
+Effect Bus Effects** section containing read-only references to Reflection Send,
+Direct Path, HRTF Spatializer, and Reflection HRTF Return. Expanding those
+resources exposes the actual live effect parameters. They are references to the
+bus resources, not copies owned or serialized by the player scene.
 
 ## Performance work still available
 

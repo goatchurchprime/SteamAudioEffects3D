@@ -1,40 +1,44 @@
 [gd_resource type="AudioBusLayout" format=3 uid="uid://cm18pdhrdpjhf"]
 
 [sub_resource type="AudioEffectSteamReflectionHRTF" id="AudioEffectSteamReflectionHRTF_j3pel"]
+listener_orientation = Basis(0.06797987, 0.50107235, -0.8627312, 0, 0.86473167, 0.50223416, 0.9976867, -0.034141812, 0.058784347)
+wet_gain = 0.63095737
 resource_name = "Reflection HRTF Return"
 
-[sub_resource type="AudioEffectSteamReflectionSend" id="AudioEffectSteamReflectionSend_j3pel"]
+[sub_resource type="AudioEffectSteamReflectionSend" id="AudioEffectSteamReflectionSend_g28q7"]
+enabled = true
 send_gain = 0.25118864
+reverb_times = Vector3(2.2, 1.8, 1.3)
 target = SubResource("AudioEffectSteamReflectionHRTF_j3pel")
 resource_name = "Reflection Send"
 
-[sub_resource type="AudioEffectSteamDirect" id="AudioEffectSteamDirect_j3pel"]
-air_absorption = Vector3(0.999292, 0.9939979, 0.9375816)
+[sub_resource type="AudioEffectSteamDirect" id="AudioEffectSteamDirect_n8wo2"]
+air_absorption = Vector3(0.99854976, 0.98773974, 0.8762811)
 resource_name = "Direct Path"
 
-[sub_resource type="AudioEffectSteamSpatial" id="AudioEffectSteamSpatial_j3pel"]
-direction = Vector3(-0.92179334, 0, 0.38768175)
+[sub_resource type="AudioEffectSteamSpatial" id="AudioEffectSteamSpatial_5t1r3"]
+direction = Vector3(-0.20927124, 0.12752005, -0.9695072)
 resource_name = "HRTF Spatializer"
 
 [resource]
 bus/0/volume_db = 0.46499825
-bus/1/name = &"QPlayerBus_Editor"
+bus/1/name = &"NativeSpatial"
 bus/1/solo = false
 bus/1/mute = false
 bus/1/bypass_fx = false
 bus/1/volume_db = 0.0
 bus/1/send = &"Master"
-bus/1/effect/0/effect = SubResource("AudioEffectSteamReflectionSend_j3pel")
-bus/1/effect/0/enabled = true
-bus/1/effect/1/effect = SubResource("AudioEffectSteamDirect_j3pel")
-bus/1/effect/1/enabled = true
-bus/1/effect/2/effect = SubResource("AudioEffectSteamSpatial_j3pel")
-bus/1/effect/2/enabled = true
-bus/1/effect/3/effect = SubResource("AudioEffectSteamReflectionHRTF_j3pel")
-bus/1/effect/3/enabled = true
-bus/2/name = &"NativeSpatial"
+bus/2/name = &"QPlayerBus_Editor"
 bus/2/solo = false
 bus/2/mute = false
 bus/2/bypass_fx = false
 bus/2/volume_db = 0.0
 bus/2/send = &"Master"
+bus/2/effect/0/effect = SubResource("AudioEffectSteamReflectionSend_g28q7")
+bus/2/effect/0/enabled = true
+bus/2/effect/1/effect = SubResource("AudioEffectSteamDirect_n8wo2")
+bus/2/effect/1/enabled = true
+bus/2/effect/2/effect = SubResource("AudioEffectSteamSpatial_5t1r3")
+bus/2/effect/2/enabled = true
+bus/2/effect/3/effect = SubResource("AudioEffectSteamReflectionHRTF_j3pel")
+bus/2/effect/3/enabled = true

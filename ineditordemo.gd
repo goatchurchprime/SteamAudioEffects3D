@@ -179,11 +179,11 @@ func _apply_source_mutes() -> void:
 func _ensure_preview_buses() -> void:
 	var private_bus_index := AudioServer.get_bus_index(QUALITY_PRIVATE_BUS)
 	if private_bus_index < 0:
-		push_warning("The saved QPlayerBus_Editor inspection bus is missing")
+		push_warning("The saved QPlayerBus_Editor spatial effect bus is missing")
 	if AudioServer.get_bus_index(NATIVE_PREVIEW_BUS) < 0:
-		push_warning("The saved NativeSpatial inspection bus is missing")
+		push_warning("The saved NativeSpatial preview bus is missing")
 
 func _remove_preview_buses() -> void:
-	# Both inspection buses are authored in default_bus_layout.tres so the Audio
+	# Both preview buses are authored in default_bus_layout.tres so the Audio
 	# dock always exposes the complete mechanism. Preview owns no buses.
 	pass
