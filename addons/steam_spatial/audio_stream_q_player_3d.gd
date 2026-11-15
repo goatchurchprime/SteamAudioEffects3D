@@ -92,7 +92,7 @@ var _native_audio_bus_hint := -1
 			return
 		if value:
 			if not player.playing:
-				player.play()
+				play()
 		else:
 			player.stop()
 ## If [code]true[/code], the active stream playback is paused.
@@ -381,6 +381,10 @@ func play(from_position := 0.0) -> void:
 		# cannot move an already-running sample into the software bus mixer.
 		if _active_backend == SpatialBackend.STEAM_AUDIO:
 			player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
+			# Effect resources begin with audible unity defaults. Prime the complete
+			# chain synchronously so the audio thread cannot render an initial block
+			# before the first physics update copies this player's authored state.
+			_update_spatialization()
 		player.play(from_position)
 
 ## Moves the playback position to [param to_position] seconds.
@@ -676,9 +680,27 @@ func _exit_tree() -> void:
 func _update_spatialization() -> void:
 	if steam_reflection_send == null or steam_direct == null or steam_hrtf == null or steam_reflection_hrtf == null:
 		return
-	# Reflection controls do not depend on a listener. Keep the live effect in
-	# sync even when an editor viewport has not produced a camera yet.
-	_push_reflection_parameters()
+	# Always replace the native effects' audible unity defaults, even before a
+	# listener exists. Listener-derived values below refine these safe authored
+	# defaults when spatial state is available.
+	var source_gain := db_to_linear(minf(volume_db, max_db))
+	var spatial_blend := clampf(
+			float(ProjectSettings.get_setting("audio/general/3d_panning_strength")) * panning_strength,
+			0.0,
+			1.0)
+	steam_direct.set("distance_attenuation_enabled", attenuation_model != AudioStreamPlayer3D.ATTENUATION_DISABLED)
+	steam_direct.set("distance_attenuation", 1.0)
+	steam_direct.set("air_absorption", Vector3.ONE)
+	steam_direct.set("directivity", 1.0)
+	steam_hrtf.call("set_source_parameters", Vector3(0.0, 0.0, -1.0), source_gain, spatial_blend)
+	steam_reflection_send.set("enabled", reflections_enabled)
+	steam_reflection_send.set("send_gain", source_gain * db_to_linear(reflection_send_db))
+	steam_reflection_send.set("reverb_times", reflection_reverb_times)
+	steam_reflection_hrtf.call("set_listener_parameters", Basis.IDENTITY, db_to_linear(reflection_wet_db))
+	var audio_player := _get_audio_player()
+	if audio_player != null:
+		audio_player.pitch_scale = _pitch_scale
+
 	var listener := _get_spatial_listener()
 	if listener == null:
 		return
@@ -715,7 +737,6 @@ func _update_spatialization() -> void:
 			exp(-0.0182 * distance)))
 	steam_direct.set("directivity", source_directivity)
 
-	var source_gain := db_to_linear(minf(volume_db, max_db))
 	if max_distance > 0.0:
 		source_gain *= maxf(0.0, 1.0 - distance / max_distance)
 	steam_reflection_send.set("enabled", reflections_enabled)
@@ -731,10 +752,6 @@ func _update_spatialization() -> void:
 			"set_listener_parameters",
 			listener.global_basis.orthonormalized(),
 			db_to_linear(reflection_wet_db))
-	var spatial_blend := clampf(
-			float(ProjectSettings.get_setting("audio/general/3d_panning_strength")) * panning_strength,
-			0.0,
-			1.0)
 	steam_hrtf.call("set_source_parameters", direction, source_gain, spatial_blend)
 	_update_doppler(listener, local_position, source_gain)
 
