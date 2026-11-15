@@ -51,6 +51,8 @@ const SPATIAL_BUS_CONSTRUCT_NOW := &"Construct Now"
 
 var _stream: AudioStream
 var _playing_requested := false
+var _editor_resume_pending := false
+var _editor_resume_position := 0.0
 var _stream_paused := false
 var _max_polyphony := 1
 var _playback_type: AudioServer.PlaybackType = AudioServer.PLAYBACK_TYPE_STREAM
@@ -84,6 +86,7 @@ var _native_audio_bus_hint := -1
 		return player.playing if player != null else _playing_requested
 	set(value):
 		_playing_requested = value
+		_editor_resume_pending = false
 		var player := _get_active_player()
 		if player == null or not player.is_inside_tree():
 			return
@@ -370,6 +373,7 @@ func get_spatial_capabilities() -> Dictionary:
 ## Starts playback at [param from_position] seconds.
 func play(from_position := 0.0) -> void:
 	_playing_requested = true
+	_editor_resume_pending = false
 	var player := _get_active_player()
 	if player != null:
 		# Set this on the actual player immediately before every new playback.
@@ -388,6 +392,7 @@ func seek(to_position: float) -> void:
 ## Stops playback without emitting [signal finished].
 func stop() -> void:
 	_playing_requested = false
+	_editor_resume_pending = false
 	var player := _get_active_player()
 	if player != null:
 		player.stop()
@@ -414,6 +419,7 @@ func has_stream_playback() -> bool:
 
 func _on_stream_finished() -> void:
 	_playing_requested = false
+	_editor_resume_pending = false
 	finished.emit()
 
 func begin_editor_preview(preview_bus: StringName) -> void:
@@ -815,10 +821,18 @@ func _physics_process(_delta: float) -> void:
 	var player := _get_active_player()
 	if Engine.is_editor_hint() and not _is_in_active_editor_scene():
 		if player != null and player.playing:
+			# This is an intentional editor interruption, unlike natural EOF. Record
+			# exactly this stop so returning to the scene tab can resume it without
+			# treating every stopped one-shot as something that should be restarted.
+			_editor_resume_position = player.get_playback_position()
+			_editor_resume_pending = _playing_requested
 			player.stop()
 		return
-	if Engine.is_editor_hint() and _playing_requested and player != null and not player.playing:
-		play()
+	if Engine.is_editor_hint() and _editor_resume_pending:
+		var resume_position := _editor_resume_position
+		_editor_resume_pending = false
+		if _playing_requested and player != null and not player.playing:
+			play(resume_position)
 	if player == null or (Engine.is_editor_hint() and not player.playing):
 		return
 	if _active_backend == SpatialBackend.GODOT_NATIVE:
