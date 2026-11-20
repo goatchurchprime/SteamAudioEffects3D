@@ -28,7 +28,7 @@ Each player uses a spatial effect bus with these visible effects:
 1. Reflection Send: pass-through dry audio plus an optional Steam parametric-reverb submission.
 2. Steam Audio Direct Path: distance gain, physical three-band air absorption, and source directivity.
 3. Steam Audio HRTF Spatializer: listener-relative point-source binaural rendering.
-4. Reflection HRTF Return: Ambisonic rotation/decoding and wet/dry summing.
+4. Reflection HRTF Return: listener-oriented Ambisonic decoding and wet/dry summing.
 
 The effects deliberately remain separate because the native library models the direct path before binaural
 rendering while reflected audio travels beside that path. The player updates the resources together, and the complete mechanism remains visible in Godot's Audio
@@ -57,10 +57,12 @@ safe; assign real recordings to the scene's exported `voice_stream` and
 `footstep_stream` fields for production listening.
 
 Keyboard controls are shown in the scene: **Space** plays, **B** switches the
-backend, **S** changes signal, **P** changes diffuse preset, **R** starts a
-random hidden-source trial, the arrow keys turn the listener/change elevation,
-and **H** reveals and scores. The current reflection presets are order-0 diffuse
-reverb, so use **Dry** when comparing direct-source localization.
+backend, **S** changes signal, **P** changes reflection preset, **D** isolates
+the wet reflection path, **R** starts a random hidden-source trial, and
+**Shift+R** randomizes listener yaw without moving the source or baked field.
+The arrow keys turn the listener/change source elevation, and **H** reveals and
+scores. Steam's parametric presets are order-0 diffuse reverb; the baked
+reference fields contain directional ambisonic reflections.
 
 For VR, retain the same source rig and let the XR viewport's active listener
 drive both players. Set `pointing_node_path` to an `XRController3D` to score its

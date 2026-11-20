@@ -17,6 +17,12 @@ if not os.path.exists(os.path.join(steam_include, "phonon.h")):
     sys.exit(1)
 
 env = SConscript("godot-cpp/SConstruct")
+if os.environ.get("CROSS_CC"):
+    env.Replace(
+        CC=os.environ["CROSS_CC"],
+        CXX=os.environ["CROSS_CXX"],
+        AR=os.environ["CROSS_AR"],
+    )
 env.Append(CPPPATH=["src", steam_include])
 env.Append(LIBPATH=[steam_lib])
 env.Append(LIBS=["phonon"])
@@ -27,7 +33,7 @@ if env.get("is_msvc", False):
 else:
     env.Append(CXXFLAGS=["-Wall", "-Wextra", "-Wno-unused-parameter"])
 
-addon_bin = "addons/steam_spatial/bin"
+addon_bin = os.environ.get("STEAM_SPATIAL_OUTPUT_DIR", "addons/steam_spatial/bin")
 os.makedirs(addon_bin, exist_ok=True)
 sources = Glob("src/*.cpp")
 if env["target"] in ["editor", "template_debug"]:

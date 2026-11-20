@@ -7,6 +7,7 @@
 
 #include <godot_cpp/classes/audio_effect.hpp>
 #include <godot_cpp/classes/audio_effect_instance.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
 #include <phonon.h>
@@ -31,6 +32,13 @@ public:
 		std::atomic<float> gain{ 1.0f };
 		std::atomic<float> spatial_blend{ 1.0f };
 		std::atomic<int> interpolation{ INTERPOLATION_BILINEAR };
+		std::atomic<float> diagnostic_trigger_peak{ 2.0f };
+		std::atomic<bool> diagnostic_triggered{ false };
+		std::atomic<float> diagnostic_input_peak{ 0.0f };
+		std::atomic<float> diagnostic_mono_peak{ 0.0f };
+		std::atomic<float> diagnostic_output_peak{ 0.0f };
+		std::atomic<bool> diagnostic_input_finite{ true };
+		std::atomic<bool> diagnostic_output_finite{ true };
 	};
 
 private:
@@ -55,6 +63,11 @@ public:
 	void set_interpolation(Interpolation value);
 	Interpolation get_interpolation() const;
 	void set_source_parameters(const Vector3 &source_direction, float source_gain, float source_spatial_blend = 1.0f);
+	void set_diagnostic_trigger_peak(float value);
+	float get_diagnostic_trigger_peak() const;
+	bool is_diagnostic_capture_ready() const;
+	Dictionary get_diagnostic_report() const;
+	void reset_diagnostic_capture();
 };
 
 class AudioEffectSteamSpatialInstance : public AudioEffectInstance {

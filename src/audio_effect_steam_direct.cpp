@@ -106,6 +106,42 @@ void AudioEffectSteamDirect::set_transmission(const Vector3 &value) {
 
 Vector3 AudioEffectSteamDirect::get_transmission() const { return transmission; }
 
+void AudioEffectSteamDirect::set_diagnostic_trigger_peak(float value) {
+	parameters->diagnostic_trigger_peak.store(std::max(value, 0.001f), std::memory_order_relaxed);
+}
+
+float AudioEffectSteamDirect::get_diagnostic_trigger_peak() const {
+	return parameters->diagnostic_trigger_peak.load(std::memory_order_relaxed);
+}
+
+bool AudioEffectSteamDirect::is_diagnostic_capture_ready() const {
+	return parameters->diagnostic_triggered.load(std::memory_order_acquire);
+}
+
+Dictionary AudioEffectSteamDirect::get_diagnostic_report() const {
+	Dictionary report;
+	if (!is_diagnostic_capture_ready()) {
+		return report;
+	}
+	report["stage"] = "direct_path";
+	report["input_peak"] = parameters->diagnostic_input_peak.load(std::memory_order_relaxed);
+	report["output_peak"] = parameters->diagnostic_output_peak.load(std::memory_order_relaxed);
+	report["input_finite"] = parameters->diagnostic_input_finite.load(std::memory_order_relaxed);
+	report["output_finite"] = parameters->diagnostic_output_finite.load(std::memory_order_relaxed);
+	report["distance_attenuation"] = parameters->distance_attenuation.load(std::memory_order_relaxed);
+	report["air_absorption"] = Vector3(
+			parameters->air_absorption_low.load(std::memory_order_relaxed),
+			parameters->air_absorption_mid.load(std::memory_order_relaxed),
+			parameters->air_absorption_high.load(std::memory_order_relaxed));
+	report["directivity"] = parameters->directivity.load(std::memory_order_relaxed);
+	report["occlusion"] = parameters->occlusion.load(std::memory_order_relaxed);
+	return report;
+}
+
+void AudioEffectSteamDirect::reset_diagnostic_capture() {
+	parameters->diagnostic_triggered.store(false, std::memory_order_release);
+}
+
 void AudioEffectSteamDirect::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_distance_attenuation_enabled", "enabled"), &AudioEffectSteamDirect::set_distance_attenuation_enabled);
 	ClassDB::bind_method(D_METHOD("is_distance_attenuation_enabled"), &AudioEffectSteamDirect::is_distance_attenuation_enabled);
@@ -129,6 +165,11 @@ void AudioEffectSteamDirect::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_transmission_type"), &AudioEffectSteamDirect::get_transmission_type);
 	ClassDB::bind_method(D_METHOD("set_transmission", "coefficients"), &AudioEffectSteamDirect::set_transmission);
 	ClassDB::bind_method(D_METHOD("get_transmission"), &AudioEffectSteamDirect::get_transmission);
+	ClassDB::bind_method(D_METHOD("set_diagnostic_trigger_peak", "peak"), &AudioEffectSteamDirect::set_diagnostic_trigger_peak);
+	ClassDB::bind_method(D_METHOD("get_diagnostic_trigger_peak"), &AudioEffectSteamDirect::get_diagnostic_trigger_peak);
+	ClassDB::bind_method(D_METHOD("is_diagnostic_capture_ready"), &AudioEffectSteamDirect::is_diagnostic_capture_ready);
+	ClassDB::bind_method(D_METHOD("get_diagnostic_report"), &AudioEffectSteamDirect::get_diagnostic_report);
+	ClassDB::bind_method(D_METHOD("reset_diagnostic_capture"), &AudioEffectSteamDirect::reset_diagnostic_capture);
 	ADD_GROUP("Distance Attenuation", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "distance_attenuation_enabled"), "set_distance_attenuation_enabled", "is_distance_attenuation_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "distance_attenuation", PROPERTY_HINT_RANGE, "0,1,0.001"), "set_distance_attenuation", "get_distance_attenuation");
@@ -261,9 +302,35 @@ void AudioEffectSteamDirectInstance::_process(const void *src_buffer, AudioFrame
 	effect_parameters.transmission[2] = parameters->transmission_high.load(std::memory_order_relaxed);
 	iplDirectEffectApply(direct_effect, &effect_parameters, &input_buffer, &output_buffer);
 
+	float input_peak = 0.0f;
+	float output_peak = 0.0f;
+	bool input_finite = true;
+	bool output_finite = true;
 	for (int32_t i = 0; i < frame_count; ++i) {
 		dst_buffer[i].left = output_buffer.data[0][i];
 		dst_buffer[i].right = output_buffer.data[1][i];
+		const float input_values[2] = { src[i].left, src[i].right };
+		const float output_values[2] = { dst_buffer[i].left, dst_buffer[i].right };
+		for (float value : input_values) {
+			input_finite = input_finite && std::isfinite(value);
+			if (std::isfinite(value)) input_peak = std::max(input_peak, std::abs(value));
+		}
+		for (float value : output_values) {
+			output_finite = output_finite && std::isfinite(value);
+			if (std::isfinite(value)) output_peak = std::max(output_peak, std::abs(value));
+		}
+	}
+	if (parameters->diagnostic_enabled.load(std::memory_order_relaxed) &&
+			(!input_finite || !output_finite ||
+			 input_peak > parameters->diagnostic_trigger_peak.load(std::memory_order_relaxed) ||
+			 output_peak > parameters->diagnostic_trigger_peak.load(std::memory_order_relaxed))) {
+		if (!parameters->diagnostic_triggered.load(std::memory_order_relaxed)) {
+			parameters->diagnostic_input_peak.store(input_peak, std::memory_order_relaxed);
+			parameters->diagnostic_output_peak.store(output_peak, std::memory_order_relaxed);
+			parameters->diagnostic_input_finite.store(input_finite, std::memory_order_relaxed);
+			parameters->diagnostic_output_finite.store(output_finite, std::memory_order_relaxed);
+			parameters->diagnostic_triggered.store(true, std::memory_order_release);
+		}
 	}
 }
 

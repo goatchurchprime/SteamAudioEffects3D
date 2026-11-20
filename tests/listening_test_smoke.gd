@@ -12,6 +12,7 @@ func _run() -> void:
 	await physics_frame
 
 	var listener := demo.get_node("Listener") as AudioListener3D
+	var source_rig := demo.get_node("SourceRig") as Node3D
 	var native_player := demo.get_node("SourceRig/NativeAudioStreamPlayer3D") as AudioStreamPlayer3D
 	var quality_player := demo.get_node("SourceRig/AudioStreamQPlayer3D") as AudioStreamQPlayer3D
 	assert(listener.is_current(), "Listening test must make its explicit listener current")
@@ -25,6 +26,15 @@ func _run() -> void:
 	assert(quality_player.reflection_reverb_times == Vector3(2.2, 1.8, 1.3))
 	assert(quality_player.steam_reflection_send.enabled)
 	assert(quality_player.steam_reflection_send.reverb_times == Vector3(2.2, 1.8, 1.3))
+
+	var source_position_before_listener_turn := source_rig.position
+	var listener_yaw_before := listener.rotation_degrees.y
+	demo.call("_randomize_listener_yaw")
+	await physics_frame
+	assert(not is_equal_approx(listener.rotation_degrees.y, listener_yaw_before),
+			"Shift+R listener test must select a different yaw")
+	assert(source_rig.position == source_position_before_listener_turn,
+			"Listener randomization must not move the sound source")
 
 	demo.call("_randomize_hidden_source")
 	assert(not demo.get_node("SourceRig/Marker").visible,
@@ -46,6 +56,7 @@ func _run() -> void:
 	demo.queue_free()
 	await process_frame
 	listener = null
+	source_rig = null
 	native_player = null
 	quality_player = null
 	demo = null

@@ -61,9 +61,21 @@ does not recover the original stereo image.
 `AudioEffectSteamReflectionSend` is a normal pass-through bus effect with one
 additional relationship: its `target` is an
 `AudioEffectSteamReflectionHRTF` resource. It folds its input to mono, applies
-Steam Audio's parametric reflection processor using the three `reverb_times`,
-and submits an omnidirectional first-order Ambisonic block to that target. Its
-ordinary Godot output remains the unchanged dry signal.
+one of two reflection renderers, and submits a first-order Ambisonic block to
+that target. Its ordinary Godot output remains the unchanged dry signal.
+
+With an empty `energy_field`, the renderer is Steam Audio's inexpensive
+parametric reverb using the three `reverb_times`. A populated field contains
+`4 channels * 3 bands * N time bins`; every bin represents 10 ms. The flattened
+layout is channel-major, then low/mid/high band, then time. Steam Audio's public
+`IPLEnergyField`, `IPLReconstructor`, and `IPLImpulseResponse` APIs reconstruct
+the four-channel impulse response when `set_energy_field()` is called. The addon
+then prepares fixed-size FFT partitions outside `_process()` and streams the
+convolution on the audio thread. No Valve source is modified.
+
+The internal 2048-sample convolution partition is independent of Godot's
+callback size. At 48 kHz it adds about 42.7 ms to the reflected path, keeping
+multi-second four-channel fields practical in an unoptimized build.
 
 The target is deliberately the effect resource rather than its effect instance.
 The receiver resource directly owns four float arrays, one per first-order
@@ -73,10 +85,9 @@ copy-adds the submitted block. There is no sidecar transport object. Godot can
 recreate playback instances without invalidating the resource link, and
 multiple sends can target one return resource.
 
-This is an immediately usable diffuse reverb and a transport proof, not yet a
-geometry-derived reflection simulation. A future convolution producer can feed
-directional four-channel reflection data into the same receiver without changing
-the Godot bus arrangement.
+The field producer is intentionally separate. Presets, procedural room models,
+baked assets, or a future geometry simulation can all load the same stable
+render interface without changing the Godot bus arrangement.
 
 ## AudioEffectSteamReflectionHRTF
 
@@ -87,6 +98,10 @@ decodes them with an Ambisonic HRTF decoder, and adds the wet result to the dry
 input. The four dynamically sized channel arrays are owned directly by this
 effect resource; there is no additional state object, Godot object, or public
 Ambisonic bus.
+
+`dry_gain` and `wet_gain` make the return observable as a conventional parallel
+effect. Set `dry_gain` to zero to hear only reflections, or `wet_gain` to zero
+to verify that the direct chain passes through unchanged.
 
 The QPlayer stack is therefore:
 
@@ -106,11 +121,11 @@ feature. Steam divides simulation results into three paths:
 - `pathing`: indirect paths, often represented as an Ambisonic sound field.
 
 The Direct effect handles only the first category, and the point HRTF effect
-spatializes the resulting direct source. The new reflection pair handles a
-manual parametric approximation and establishes the Ambisonic transport. Full
-geometry-derived reflections and pathing still require corresponding
-impulse-response or path data; the five direct-path scalars and three RT60 values
-are not sufficient.
+spatializes the resulting direct source. The reflection pair accepts either a
+manual parametric approximation or a full directional energy field.
+Geometry-derived reflections still require separate machinery to calculate or
+retrieve that field, while pathing requires its own path data; the five
+direct-path scalars and three RT60 values are not sufficient.
 
 This separation matches Steam Audio's integration guidance: simulation results
 are transferred from a game/simulation thread to render effects on the audio

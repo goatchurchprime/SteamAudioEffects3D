@@ -87,7 +87,9 @@ playback_type = 1
 [node name="AudioStreamQPlayer3D" parent="SourceRig" unique_id=1209746152 instance=ExtResource("2_qplayer")]
 max_polyphony = 6
 playback_type = 1
+spatial_effect_bus = &"Construct Runtime"
 unit_size = 4.0
+reflection_energy_field_duration = 1.0
 
 [node name="FootstepTimer" type="Timer" parent="." unique_id=4141239]
 wait_time = 0.62
@@ -107,7 +109,7 @@ theme_override_constants/separation = 8
 [node name="Title" type="Label" parent="UI/Margin/VBox" unique_id=441438633]
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
-text = "Steam Audio localization and diffuse-reverb audition"
+text = "Steam Audio localization, room and discrete-echo audition"
 
 [node name="Status" type="Label" parent="UI/Margin/VBox" unique_id=32109646]
 layout_mode = 2
@@ -130,7 +132,7 @@ text = "Signal"
 [node name="Preset" type="Button" parent="UI/Margin/VBox/Controls" unique_id=1906286235]
 layout_mode = 2
 focus_mode = 0
-text = "Diffuse preset"
+text = "Reflection preset"
 
 [node name="Actions" type="HBoxContainer" parent="UI/Margin/VBox" unique_id=806580517]
 layout_mode = 2

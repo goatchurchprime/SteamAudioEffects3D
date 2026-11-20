@@ -7,6 +7,7 @@
 
 #include <godot_cpp/classes/audio_effect.hpp>
 #include <godot_cpp/classes/audio_effect_instance.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
 #include <phonon.h>
@@ -40,6 +41,13 @@ public:
 		std::atomic<float> transmission_low{ 1.0f };
 		std::atomic<float> transmission_mid{ 1.0f };
 		std::atomic<float> transmission_high{ 1.0f };
+		std::atomic<bool> diagnostic_enabled{ true };
+		std::atomic<float> diagnostic_trigger_peak{ 2.0f };
+		std::atomic<bool> diagnostic_triggered{ false };
+		std::atomic<float> diagnostic_input_peak{ 0.0f };
+		std::atomic<float> diagnostic_output_peak{ 0.0f };
+		std::atomic<bool> diagnostic_input_finite{ true };
+		std::atomic<bool> diagnostic_output_finite{ true };
 	};
 
 private:
@@ -84,6 +92,11 @@ public:
 	TransmissionType get_transmission_type() const;
 	void set_transmission(const Vector3 &value);
 	Vector3 get_transmission() const;
+	void set_diagnostic_trigger_peak(float value);
+	float get_diagnostic_trigger_peak() const;
+	bool is_diagnostic_capture_ready() const;
+	Dictionary get_diagnostic_report() const;
+	void reset_diagnostic_capture();
 };
 
 class AudioEffectSteamDirectInstance : public AudioEffectInstance {

@@ -55,6 +55,42 @@ void AudioEffectSteamSpatial::set_source_parameters(const Vector3 &source_direct
 	set_spatial_blend(source_spatial_blend);
 }
 
+void AudioEffectSteamSpatial::set_diagnostic_trigger_peak(float value) {
+	parameters->diagnostic_trigger_peak.store(std::max(value, 0.001f), std::memory_order_relaxed);
+}
+
+float AudioEffectSteamSpatial::get_diagnostic_trigger_peak() const {
+	return parameters->diagnostic_trigger_peak.load(std::memory_order_relaxed);
+}
+
+bool AudioEffectSteamSpatial::is_diagnostic_capture_ready() const {
+	return parameters->diagnostic_triggered.load(std::memory_order_acquire);
+}
+
+Dictionary AudioEffectSteamSpatial::get_diagnostic_report() const {
+	Dictionary report;
+	if (!is_diagnostic_capture_ready()) {
+		return report;
+	}
+	report["stage"] = "hrtf_spatializer";
+	report["input_peak"] = parameters->diagnostic_input_peak.load(std::memory_order_relaxed);
+	report["mono_peak_after_gain"] = parameters->diagnostic_mono_peak.load(std::memory_order_relaxed);
+	report["output_peak"] = parameters->diagnostic_output_peak.load(std::memory_order_relaxed);
+	report["input_finite"] = parameters->diagnostic_input_finite.load(std::memory_order_relaxed);
+	report["output_finite"] = parameters->diagnostic_output_finite.load(std::memory_order_relaxed);
+	report["gain"] = parameters->gain.load(std::memory_order_relaxed);
+	report["spatial_blend"] = parameters->spatial_blend.load(std::memory_order_relaxed);
+	report["direction"] = Vector3(
+			parameters->direction_x.load(std::memory_order_relaxed),
+			parameters->direction_y.load(std::memory_order_relaxed),
+			parameters->direction_z.load(std::memory_order_relaxed));
+	return report;
+}
+
+void AudioEffectSteamSpatial::reset_diagnostic_capture() {
+	parameters->diagnostic_triggered.store(false, std::memory_order_release);
+}
+
 void AudioEffectSteamSpatial::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_direction", "direction"), &AudioEffectSteamSpatial::set_direction);
 	ClassDB::bind_method(D_METHOD("get_direction"), &AudioEffectSteamSpatial::get_direction);
@@ -65,6 +101,11 @@ void AudioEffectSteamSpatial::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_interpolation", "interpolation"), &AudioEffectSteamSpatial::set_interpolation);
 	ClassDB::bind_method(D_METHOD("get_interpolation"), &AudioEffectSteamSpatial::get_interpolation);
 	ClassDB::bind_method(D_METHOD("set_source_parameters", "direction", "gain", "spatial_blend"), &AudioEffectSteamSpatial::set_source_parameters, DEFVAL(1.0f));
+	ClassDB::bind_method(D_METHOD("set_diagnostic_trigger_peak", "peak"), &AudioEffectSteamSpatial::set_diagnostic_trigger_peak);
+	ClassDB::bind_method(D_METHOD("get_diagnostic_trigger_peak"), &AudioEffectSteamSpatial::get_diagnostic_trigger_peak);
+	ClassDB::bind_method(D_METHOD("is_diagnostic_capture_ready"), &AudioEffectSteamSpatial::is_diagnostic_capture_ready);
+	ClassDB::bind_method(D_METHOD("get_diagnostic_report"), &AudioEffectSteamSpatial::get_diagnostic_report);
+	ClassDB::bind_method(D_METHOD("reset_diagnostic_capture"), &AudioEffectSteamSpatial::reset_diagnostic_capture);
 
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "direction"), "set_direction", "get_direction");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gain", PROPERTY_HINT_RANGE, "0,4,0.001,or_greater"), "set_gain", "get_gain");
@@ -161,8 +202,17 @@ void AudioEffectSteamSpatialInstance::_process(const void *src_buffer, AudioFram
 	}
 
 	const float gain = parameters->gain.load(std::memory_order_relaxed);
+	float input_peak = 0.0f;
+	float mono_peak = 0.0f;
+	bool input_finite = true;
 	for (int32_t i = 0; i < frame_count; ++i) {
 		mono[i] = 0.5f * (src[i].left + src[i].right) * gain;
+		const float input_values[2] = { src[i].left, src[i].right };
+		for (float value : input_values) {
+			input_finite = input_finite && std::isfinite(value);
+			if (std::isfinite(value)) input_peak = std::max(input_peak, std::abs(value));
+		}
+		if (std::isfinite(mono[i])) mono_peak = std::max(mono_peak, std::abs(mono[i]));
 	}
 
 	IPLVector3 direction{
@@ -189,9 +239,26 @@ void AudioEffectSteamSpatialInstance::_process(const void *src_buffer, AudioFram
 	effect_parameters.peakDelays = nullptr;
 	iplBinauralEffectApply(binaural_effect, &effect_parameters, &input_buffer, &output_buffer);
 
+	float output_peak = 0.0f;
+	bool output_finite = true;
 	for (int32_t i = 0; i < frame_count; ++i) {
 		dst_buffer[i].left = output_buffer.data[0][i];
 		dst_buffer[i].right = output_buffer.data[1][i];
+		const float output_values[2] = { dst_buffer[i].left, dst_buffer[i].right };
+		for (float value : output_values) {
+			output_finite = output_finite && std::isfinite(value);
+			if (std::isfinite(value)) output_peak = std::max(output_peak, std::abs(value));
+		}
+	}
+	const float threshold = parameters->diagnostic_trigger_peak.load(std::memory_order_relaxed);
+	if ((!input_finite || !output_finite || input_peak > threshold || mono_peak > threshold || output_peak > threshold) &&
+			!parameters->diagnostic_triggered.load(std::memory_order_relaxed)) {
+		parameters->diagnostic_input_peak.store(input_peak, std::memory_order_relaxed);
+		parameters->diagnostic_mono_peak.store(mono_peak, std::memory_order_relaxed);
+		parameters->diagnostic_output_peak.store(output_peak, std::memory_order_relaxed);
+		parameters->diagnostic_input_finite.store(input_finite, std::memory_order_relaxed);
+		parameters->diagnostic_output_finite.store(output_finite, std::memory_order_relaxed);
+		parameters->diagnostic_triggered.store(true, std::memory_order_release);
 	}
 }
 

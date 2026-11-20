@@ -24,7 +24,8 @@ func _run() -> void:
 		"emission_angle_degrees", "emission_angle_filter_attenuation_db",
 		"attenuation_filter_cutoff_hz", "attenuation_filter_db", "doppler_tracking",
 		"reflection_preset", "reflections_enabled", "reflection_send_db",
-		"reflection_reverb_times", "reflection_wet_db",
+		"reflection_reverb_times", "reflection_energy_field_duration", "reflection_energy_field",
+		"direct_path_enabled", "reflection_dry_gain", "reflection_wet_db",
 	]:
 		assert(available_properties.has(property_name), "Missing AudioStreamPlayer3D-compatible property: %s" % property_name)
 
@@ -49,6 +50,15 @@ func _run() -> void:
 	assert(AudioServer.get_bus_effect(private_bus_index, 2).get_class() == "AudioEffectSteamSpatial")
 	assert(AudioServer.get_bus_effect(private_bus_index, 3).get_class() == "AudioEffectSteamReflectionHRTF")
 	assert(AudioServer.get_bus_effect(private_bus_index, 0).target == AudioServer.get_bus_effect(private_bus_index, 3))
+	player.direct_path_enabled = false
+	player._update_spatialization()
+	assert(AudioServer.get_bus_effect(private_bus_index, 3).dry_gain == 0.0,
+			"Direct-path monitoring switch must leave only the wet reflection return")
+	player.direct_path_enabled = true
+	player.apply_reflection_preset(player.ReflectionPreset.ABSORBENT_WALL)
+	var reflection_effect = AudioServer.get_bus_effect(private_bus_index, 0)
+	assert(player.reflection_energy_field.size() == 4 * 3 * reflection_effect.get_energy_field_bin_count())
+	assert(reflection_effect.energy_field.size() == player.reflection_energy_field.size())
 	for effect_index in 4:
 		assert(AudioServer.is_bus_effect_enabled(private_bus_index, effect_index))
 

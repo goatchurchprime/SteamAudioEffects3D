@@ -9,9 +9,11 @@ func _run() -> void:
 	var demo := packed.instantiate()
 	root.add_child(demo)
 	await process_frame
+	var quality_player := demo.get_node("SoundSource/AudioStreamQPlayer3D")
+	var quality_bus: StringName = quality_player.spatial_effect_bus
 
 	assert(AudioServer.bus_count == 3, "The editor demo should begin with Master and its two saved preview buses")
-	var private_bus_index := AudioServer.get_bus_index(&"QPlayerBus_Editor")
+	var private_bus_index := AudioServer.get_bus_index(quality_bus)
 	var native_bus_index := AudioServer.get_bus_index(&"NativeSpatial")
 	assert(private_bus_index >= 0)
 	assert(native_bus_index >= 0)
@@ -22,7 +24,6 @@ func _run() -> void:
 	# Keep the direction assertions independent of the position last saved while
 	# interactively dragging the demo source.
 	var source := demo.get_node("SoundSource") as Node3D
-	var quality_player := demo.get_node("SoundSource/AudioStreamQPlayer3D")
 	var native_player := demo.get_node("SoundSource/NativeAudioStreamPlayer3D") as AudioStreamPlayer3D
 	# A/B mute controls must start preview when the other renderer has not yet
 	# been started; this is the common manual-editor workflow.

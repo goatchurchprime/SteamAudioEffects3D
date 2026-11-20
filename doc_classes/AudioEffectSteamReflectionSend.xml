@@ -4,19 +4,39 @@
 		Passes dry audio onward while submitting Steam Audio reflections to an Ambisonic return effect.
 	</brief_description>
 	<description>
-		This effect belongs before [AudioEffectSteamDirect] and [AudioEffectSteamSpatial]. Its Godot stereo output is an unchanged copy of its input. In parallel, it folds the input to mono, applies Steam Audio's parametric reflection effect, packages the diffuse result as a first-order omnidirectional Ambisonic block, and submits that block to [member target].
+		This effect belongs before [AudioEffectSteamDirect] and [AudioEffectSteamSpatial]. Its Godot stereo output is an unchanged copy of its input. In parallel, it folds the input to mono and submits a first-order Ambisonic reflection block to [member target]. With an empty [member energy_field] it uses Steam Audio's inexpensive parametric reverb. With a field loaded, Steam Audio reconstructs a four-channel impulse response and this addon convolves it with the source.
 		The target is the stable [AudioEffectSteamReflectionHRTF] resource, not its transient [AudioEffectInstance]. Consequently, Godot may rebuild effect instances when the bus layout or channel configuration changes without breaking the relationship. The target resource directly owns four dynamically sized channel arrays and copy-adds submissions into them.
-		This initial implementation exposes manual RT60 values and does not inspect scene geometry. A future convolution producer can submit directional Ambisonic reflection data through the same target interface.
+		Energy-field reconstruction and convolution-kernel preparation happen when [method set_energy_field] is called, outside the audio callback. The field may come from a preset, a file, procedural authoring, or a separately run Steam Audio simulation. This effect deliberately does not inspect scene geometry.
 	</description>
 	<tutorials>
 		<link title="Steam Audio Reflection Effect">https://valvesoftware.github.io/steam-audio/doc/capi/reflections-effect.html</link>
 	</tutorials>
+	<methods>
+		<method name="clear_energy_field">
+			<return type="void" />
+			<description>
+				Clears the directional convolution field and returns the effect to parametric [member reverb_times].
+			</description>
+		</method>
+		<method name="get_energy_field_bin_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of 10 ms time bins required by [member energy_field_duration].
+			</description>
+		</method>
+	</methods>
 	<members>
+		<member name="energy_field" type="PackedFloat32Array" setter="set_energy_field" getter="get_energy_field" default="PackedFloat32Array()">
+			A flattened first-order energy field containing exactly [code]4 * 3 * get_energy_field_bin_count()[/code] floats. Layout is Ambisonic channel, frequency band, then 10 ms time bin. Setting this performs Steam Audio reconstruction and FFT preparation synchronously, so do it on a game, loading, or worker thread rather than the audio thread.
+		</member>
+		<member name="energy_field_duration" type="float" setter="set_energy_field_duration" getter="get_energy_field_duration" default="1.0">
+			Field and impulse-response duration in seconds, clamped to [code]0.01[/code]–[code]10.0[/code].
+		</member>
 		<member name="enabled" type="bool" setter="set_enabled" getter="is_enabled" default="false">
 			If [code]true[/code], generates and submits reflected audio. The dry signal remains unchanged regardless of this value.
 		</member>
 		<member name="reverb_times" type="Vector3" setter="set_reverb_times" getter="get_reverb_times" default="Vector3(1, 0.8, 0.5)">
-			Low-, mid-, and high-frequency RT60 decay times in seconds. Components are clamped to [code]0.1[/code]–[code]20.0[/code].
+			Low-, mid-, and high-frequency RT60 decay times in seconds used when [member energy_field] is empty. Components are clamped to [code]0.1[/code]–[code]20.0[/code].
 		</member>
 		<member name="send_gain" type="float" setter="set_send_gain" getter="get_send_gain" default="0.25">
 			Nonnegative linear gain applied to the reflected signal before submission.

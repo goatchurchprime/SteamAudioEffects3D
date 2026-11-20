@@ -3,6 +3,14 @@ entry_symbol = "steam_spatial_library_init"
 compatibility_minimum = "4.6"
 reloadable = true
 
+[dependencies]
+linux.debug.x86_64 = { "./bin/libphonon.so": "" }
+linux.release.x86_64 = { "./bin/libphonon.so": "" }
+linux.debug.arm64 = { "./bin/arm64/libphonon.so": "" }
+linux.release.arm64 = { "./bin/arm64/libphonon.so": "" }
+
 [libraries]
 linux.debug.x86_64 = "./bin/libsteam_spatial.linux.template_debug.x86_64.so"
 linux.release.x86_64 = "./bin/libsteam_spatial.linux.template_release.x86_64.so"
+linux.debug.arm64 = "./bin/arm64/libsteam_spatial.linux.template_debug.arm64.so"
+linux.release.arm64 = "./bin/arm64/libsteam_spatial.linux.template_release.arm64.so"

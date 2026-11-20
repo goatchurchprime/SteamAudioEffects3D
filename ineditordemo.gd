@@ -2,7 +2,6 @@
 extends Node3D
 
 const NATIVE_PREVIEW_BUS := &"NativeSpatial"
-const QUALITY_PRIVATE_BUS := &"QPlayerBus_Editor"
 const EDITOR_3D_VIEWPORT_COUNT := 4
 
 var _editor_viewport_audio_states: Array[bool] = []
@@ -59,11 +58,12 @@ func _maintain_preview_routes(native_player: AudioStreamPlayer3D, quality_player
 			native_player.bus = NATIVE_PREVIEW_BUS
 		if AudioServer.get_bus_send(native_bus_index) != &"Master":
 			AudioServer.set_bus_send(native_bus_index, &"Master")
-	var quality_bus_index := AudioServer.get_bus_index(QUALITY_PRIVATE_BUS)
+	var quality_bus := _get_quality_effect_bus(quality_player)
+	var quality_bus_index := AudioServer.get_bus_index(quality_bus)
 	if quality_player != null and quality_bus_index >= 0:
 		if AudioServer.get_bus_send(quality_bus_index) != &"Master":
 			AudioServer.set_bus_send(quality_bus_index, &"Master")
-		quality_player.begin_editor_preview(QUALITY_PRIVATE_BUS)
+		quality_player.begin_editor_preview(quality_bus)
 		if native_player != null and quality_player.stream != native_player.stream:
 			quality_player.stream = native_player.stream
 
@@ -86,7 +86,7 @@ func _start_preview() -> void:
 		push_warning("The A/B preview needs both native and quality players")
 		return
 
-	_ensure_preview_buses()
+	_ensure_preview_buses(quality_player)
 	# Both implementations receive exactly the same source material. Their outputs
 	# remain separate for direct L/R meter comparison. Bus mute is never used:
 	# playback is started and stopped at the source nodes themselves.
@@ -97,7 +97,7 @@ func _start_preview() -> void:
 	native_player.bus = NATIVE_PREVIEW_BUS
 	native_player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 	quality_player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
-	quality_player.begin_editor_preview(QUALITY_PRIVATE_BUS)
+	quality_player.begin_editor_preview(_get_quality_effect_bus(quality_player))
 	quality_player.stream = native_player.stream
 	_apply_source_mutes()
 	_begin_scene_audio_listener_override()
@@ -176,10 +176,19 @@ func _apply_source_mutes() -> void:
 		if quality_player != null and not mute_quality_at_source and not quality_player.playing:
 			quality_player.play()
 
-func _ensure_preview_buses() -> void:
-	var private_bus_index := AudioServer.get_bus_index(QUALITY_PRIVATE_BUS)
+func _get_quality_effect_bus(quality_player: Node) -> StringName:
+	if quality_player == null:
+		return &""
+	var selected_bus: StringName = quality_player.spatial_effect_bus
+	if selected_bus == AudioStreamQPlayer3D.SPATIAL_BUS_CONSTRUCT_RUNTIME or selected_bus == AudioStreamQPlayer3D.SPATIAL_BUS_CONSTRUCT_NOW:
+		return quality_player.effect_bus_name
+	return selected_bus
+
+func _ensure_preview_buses(quality_player: Node) -> void:
+	var quality_bus := _get_quality_effect_bus(quality_player)
+	var private_bus_index := AudioServer.get_bus_index(quality_bus)
 	if private_bus_index < 0:
-		push_warning("The saved QPlayerBus_Editor spatial effect bus is missing")
+		push_warning("The selected QPlayer spatial effect bus '%s' is missing" % quality_bus)
 	if AudioServer.get_bus_index(NATIVE_PREVIEW_BUS) < 0:
 		push_warning("The saved NativeSpatial preview bus is missing")
 

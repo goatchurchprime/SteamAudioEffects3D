@@ -21,6 +21,9 @@
 		</method>
 	</methods>
 	<members>
+		<member name="dry_gain" type="float" setter="set_dry_gain" getter="get_dry_gain" default="1.0">
+			Nonnegative linear gain applied to the ordinary stereo input. Set this to [code]0.0[/code] to monitor only the decoded reflection return. This control does not alter the reflection send or wet gain.
+		</member>
 		<member name="listener_orientation" type="Basis" setter="set_listener_orientation" getter="get_listener_orientation" default="Basis(1, 0, 0, 0, 1, 0, 0, 0, 1)">
 			Absolute world orientation of the listener. The decoder rotates the world-aligned Ambisonic field into head-relative coordinates before HRTF rendering.
 		</member>
