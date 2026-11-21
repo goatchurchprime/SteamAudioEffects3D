@@ -115,9 +115,15 @@ addon_bin="$repo_dir/addons/steam_spatial/bin/$output_dir"
 mkdir -p "$addon_bin"
 cd "$repo_dir"
 for target in template_debug template_release; do
+    scons_args=(platform="$platform" arch="$arch" target="$target" use_static_cpp=false -j2)
+    if [[ "$platform" == "android" ]]; then
+        # godot-cpp otherwise prefers the runner's ANDROID_HOME over the exact
+        # NDK selected above, even when ANDROID_NDK_ROOT is explicitly set.
+        scons_args+=(ANDROID_HOME=)
+    fi
     STEAM_AUDIO_ROOT="$steam_root" \
     STEAM_SPATIAL_OUTPUT_DIR="$addon_bin" \
-    scons platform="$platform" arch="$arch" target="$target" use_static_cpp=false -j2
+    scons "${scons_args[@]}"
 done
 cp "$steam_root/lib/$runtime_name" "$addon_bin/$runtime_name"
 
