@@ -5,7 +5,8 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 version="${1:?usage: package_release.sh <version> [output-directory]}"
 output_dir="${2:-$repo_dir/dist}"
 stage="$repo_dir/build/release-stage"
-archive="$output_dir/steam-audio-effects-3d-${version}.zip"
+archive_name="steam-audio-effects-3d-${version}.zip"
+archive="$output_dir/$archive_name"
 
 rm -rf "$stage"
 mkdir -p "$stage/addons" "$stage/licenses" "$output_dir"
@@ -43,5 +44,8 @@ rm -f "$archive"
     cd "$stage"
     zip -9 -qr "$archive" addons licenses
 )
-sha256sum "$archive" > "$archive.sha256"
+(
+    cd "$output_dir"
+    sha256sum "$archive_name" > "$archive_name.sha256"
+)
 echo "$archive"
