@@ -9,11 +9,10 @@
 ## references and APIs that explicitly require [AudioStreamPlayer3D] are not
 ## interchangeable.
 ##
-## The source is forced through Godot's stream mixer and a private bus containing
-## Reflection Send, [AudioEffectSteamDirect], [AudioEffectSteamSpatial], and
-## Reflection HRTF Return effects in that order. Sample playback is not supported
-## because it can bypass Godot bus effects. Stereo streams are currently folded
-## to one point source before HRTF rendering.
+## On native platforms the source is forced through Godot's stream mixer and a
+## private bus containing [AudioEffectSteamDirect] and [AudioEffectSteamSpatial].
+## Sample playback is not supported by this backend because it bypasses Godot
+## bus effects. Stereo streams are folded to one point source before HRTF rendering.
 class_name AudioStreamQPlayer3D
 extends Node3D
 
@@ -28,23 +27,6 @@ enum SpatialBackend {
 	GODOT_NATIVE,
 }
 
-## Built-in reflection starting points. The final presets load directional
-## energy fields baked from controlled geometry by Steam Audio itself.
-enum ReflectionPreset {
-	CUSTOM,
-	OFF,
-	DEAD_BOOTH,
-	FURNISHED_ROOM,
-	OFFICE,
-	LARGE_HALL,
-	STONE_TUNNEL,
-	EXAGGERATED_CAVERN,
-	ABSORBENT_WALL,
-	SMALL_SHOEBOX,
-	FAR_WALL_ECHO,
-	BIG_AUDITORIUM,
-}
-
 ## Emitted when the audio finishes playing without being interrupted by [method stop].
 signal finished
 
@@ -52,7 +34,6 @@ const CMP_EPSILON := 0.00001
 const SPEED_OF_SOUND := 343.0
 const SPATIAL_BUS_CONSTRUCT_RUNTIME := &"Construct Runtime"
 const SPATIAL_BUS_CONSTRUCT_NOW := &"Construct Now"
-const REFERENCE_ENERGY_FIELD_DIRECTORY := "res://addons/steam_spatial/reference_energy_fields/"
 
 var _stream: AudioStream
 var _playing_requested := false
@@ -60,7 +41,7 @@ var _editor_resume_pending := false
 var _editor_resume_position := 0.0
 var _stream_paused := false
 var _max_polyphony := 1
-var _playback_type: AudioServer.PlaybackType = AudioServer.PLAYBACK_TYPE_STREAM
+var _playback_type: AudioServer.PlaybackType = AudioServer.PLAYBACK_TYPE_DEFAULT
 var _pitch_scale := 1.0
 var _active_backend: SpatialBackend = SpatialBackend.GODOT_NATIVE
 var _spatial_effect_bus: StringName = SPATIAL_BUS_CONSTRUCT_RUNTIME
@@ -136,17 +117,14 @@ var volume_linear: float:
 		return db_to_linear(volume_db)
 	set(value):
 		volume_db = linear_to_db(value)
-## Compatibility property. This player always uses [constant AudioServer.PLAYBACK_TYPE_STREAM]
-## because Sample playback does not pass through Godot audio buses.
+## Selects Godot's playback implementation. The native fallback honors this
+## value. The Steam backend always uses Stream internally because Sample
+## playback does not pass through Godot audio buses.
 @export var playback_type: AudioServer.PlaybackType:
 	get:
 		return _playback_type
 	set(value):
-		# Bus effects only exist in Godot's stream mixer. Sample playback may be
-		# handled outside the engine and therefore cannot run Direct or HRTF.
-		_playback_type = AudioServer.PLAYBACK_TYPE_STREAM
-		if value == AudioServer.PLAYBACK_TYPE_SAMPLE:
-			push_warning("AudioStreamQPlayer3D requires stream playback for its bus effects")
+		_playback_type = value
 		var player := _get_audio_player()
 		if player != null:
 			player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
@@ -168,7 +146,7 @@ var volume_linear: float:
 ## [code]Construct Now[/code] creates and assigns that same uniquely named bus in
 ## the editor, allowing it to be inspected and deliberately saved in the audio
 ## bus layout. An existing bus can also be selected if it already contains the
-## four Steam spatial effects in their required order.
+## both Steam spatial effects in their required order.
 @export_custom(PROPERTY_HINT_ENUM, "Construct Runtime,Construct Now") var spatial_effect_bus: StringName:
 	get:
 		return _spatial_effect_bus
@@ -191,163 +169,6 @@ var volume_linear: float:
 ## Selects whether Doppler tracking is disabled or evaluated. Updates currently occur on physics ticks.
 @export var doppler_tracking: AudioStreamPlayer3D.DopplerTracking = AudioStreamPlayer3D.DOPPLER_TRACKING_DISABLED
 
-@export_group("Reflections")
-## A convenient reflection starting point. The final presets are fields baked
-## from explicit Steam Audio geometry; earlier entries exercise its cheaper
-## parametric renderer. Editing the fields afterwards remains possible; select
-## [constant ReflectionPreset.CUSTOM] to describe that intent explicitly.
-@export var reflection_preset: ReflectionPreset = ReflectionPreset.OFF:
-	set(value):
-		reflection_preset = value
-		_apply_reflection_preset(value)
-## Enables Steam Audio's reflection send and Ambisonic return.
-@export var reflections_enabled := false
-## Gain applied before submitting the reflected signal to the Ambisonic return.
-@export_range(-80.0, 12.0, 0.1, "suffix:dB") var reflection_send_db := -12.0
-## Low-, mid-, and high-frequency RT60 decay times in seconds.
-@export var reflection_reverb_times := Vector3(1.0, 0.8, 0.5)
-## Duration represented by [member reflection_energy_field]. Energy-field bins
-## are always 10 ms, first-order Ambisonics, and have three frequency bands.
-var _reflection_energy_field_duration := 1.0
-var _reflection_energy_field := PackedFloat32Array()
-var _reflection_field_dirty := true
-@export_range(0.01, 10.0, 0.01, "suffix:s") var reflection_energy_field_duration: float:
-	get:
-		return _reflection_energy_field_duration
-	set(value):
-		_reflection_energy_field_duration = clampf(value, 0.01, 10.0)
-		_reflection_field_dirty = true
-## Directional reflection energy stored channel-major, then band-major, then
-## time-bin-major: [code]4 channels * 3 bands * ceil(duration / 0.01)[/code].
-## An empty array selects Steam Audio's inexpensive parametric reverb instead.
-@export var reflection_energy_field: PackedFloat32Array:
-	get:
-		return _reflection_energy_field
-	set(value):
-		_reflection_energy_field = value
-		_reflection_field_dirty = true
-## If disabled, the ordinary direct/HRTF signal is removed at the final return,
-## leaving only reflections. This is useful for echo direction and microphone tests.
-@export var direct_path_enabled := true
-## Exact linear gain for the ordinary direct signal at the reflection return.
-## Compatibility/fine-level control applied after [member direct_path_enabled].
-@export_range(0.0, 1.0, 0.001, "or_greater") var reflection_dry_gain := 1.0
-## Gain applied to the decoded reflection signal before it is mixed with the dry path.
-@export_range(-80.0, 12.0, 0.1, "suffix:dB") var reflection_wet_db := 0.0
-
-## Applies one of the built-in reflection starting points.
-##
-## Directional presets load checked-in fields generated by Steam Audio's own
-## geometry baker. Parametric presets are intentionally approximate audition
-## settings. [constant ReflectionPreset.CUSTOM] leaves all fields unchanged.
-func apply_reflection_preset(preset: ReflectionPreset) -> void:
-	reflection_preset = preset
-
-func _apply_reflection_preset(preset: ReflectionPreset) -> void:
-	match preset:
-		ReflectionPreset.CUSTOM:
-			return
-		ReflectionPreset.OFF:
-			reflections_enabled = false
-			reflection_send_db = -80.0
-			reflection_reverb_times = Vector3(0.15, 0.12, 0.10)
-			reflection_energy_field = PackedFloat32Array()
-			reflection_energy_field_duration = 1.0
-			reflection_wet_db = 0.0
-		ReflectionPreset.DEAD_BOOTH:
-			_clear_directional_energy_field()
-			reflections_enabled = true
-			reflection_send_db = -20.0
-			reflection_reverb_times = Vector3(0.15, 0.12, 0.10)
-			reflection_wet_db = -6.0
-		ReflectionPreset.FURNISHED_ROOM:
-			_clear_directional_energy_field()
-			reflections_enabled = true
-			reflection_send_db = -16.0
-			reflection_reverb_times = Vector3(0.35, 0.30, 0.22)
-			reflection_wet_db = -4.0
-		ReflectionPreset.OFFICE:
-			_clear_directional_energy_field()
-			reflections_enabled = true
-			reflection_send_db = -14.0
-			reflection_reverb_times = Vector3(0.55, 0.45, 0.30)
-			reflection_wet_db = -4.0
-		ReflectionPreset.LARGE_HALL:
-			_clear_directional_energy_field()
-			reflections_enabled = true
-			reflection_send_db = -12.0
-			reflection_reverb_times = Vector3(2.20, 1.80, 1.30)
-			reflection_wet_db = -4.0
-		ReflectionPreset.STONE_TUNNEL:
-			_clear_directional_energy_field()
-			reflections_enabled = true
-			reflection_send_db = -10.0
-			reflection_reverb_times = Vector3(3.20, 2.70, 2.00)
-			reflection_wet_db = -3.0
-		ReflectionPreset.EXAGGERATED_CAVERN:
-			_clear_directional_energy_field()
-			reflections_enabled = true
-			reflection_send_db = -8.0
-			reflection_reverb_times = Vector3(5.00, 4.00, 3.00)
-			reflection_wet_db = -3.0
-		ReflectionPreset.ABSORBENT_WALL:
-			_apply_baked_reflection_field("absorbent_wall.json", -8.0, -4.0)
-		ReflectionPreset.SMALL_SHOEBOX:
-			_apply_baked_reflection_field("small_shoebox.json", -8.0, -4.0)
-		ReflectionPreset.FAR_WALL_ECHO:
-			# A single approximately 95 m reflected ray path is physically very
-			# quiet after spherical spreading. This preset is an audition aid, so
-			# compensate its level without changing the Steam-baked arrival time
-			# or direction. At unity source level it still retains ample headroom.
-			_apply_baked_reflection_field("far_wall_echo.json", 12.0, 12.0)
-		ReflectionPreset.BIG_AUDITORIUM:
-			_apply_baked_reflection_field("big_auditorium.json", -8.0, -5.0)
-	_push_reflection_parameters()
-
-func _clear_directional_energy_field() -> void:
-	reflection_energy_field = PackedFloat32Array()
-	reflection_energy_field_duration = 1.0
-
-func _apply_baked_reflection_field(file_name: String, send_db: float, wet_db: float) -> void:
-	var path := REFERENCE_ENERGY_FIELD_DIRECTORY + file_name
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if not parsed is Dictionary or parsed.get("format", "") != "steam_audio_energy_field_v1":
-		push_error("AudioStreamQPlayer3D could not load Steam Audio energy field: " + path)
-		reflections_enabled = false
-		_clear_directional_energy_field()
-		return
-	var duration := float(parsed.get("duration", 0.0))
-	var bins := int(parsed.get("bins", 0))
-	var values := PackedFloat32Array(parsed.get("energy_field", []))
-	if duration <= 0.0 or bins <= 0 or values.size() != 4 * 3 * bins:
-		push_error("AudioStreamQPlayer3D rejected malformed Steam Audio energy field: " + path)
-		reflections_enabled = false
-		_clear_directional_energy_field()
-		return
-	var rt60: Array = parsed.get("reverb_times", [])
-	if rt60.size() == 3:
-		reflection_reverb_times = Vector3(float(rt60[0]), float(rt60[1]), float(rt60[2]))
-	reflections_enabled = true
-	reflection_send_db = send_db
-	reflection_wet_db = wet_db
-	reflection_energy_field_duration = duration
-	reflection_energy_field = values
-
-func _push_reflection_parameters() -> void:
-	if steam_reflection_send != null:
-		steam_reflection_send.set("enabled", reflections_enabled)
-		steam_reflection_send.set("send_gain", db_to_linear(volume_db) * db_to_linear(reflection_send_db))
-		steam_reflection_send.set("reverb_times", reflection_reverb_times)
-		# Clear first so changing dimensions never momentarily reconstructs old
-		# data using a new bin count while a serialized preset is being applied.
-		steam_reflection_send.call("clear_energy_field")
-		steam_reflection_send.set("energy_field_duration", reflection_energy_field_duration)
-		steam_reflection_send.set("energy_field", reflection_energy_field)
-		_reflection_field_dirty = false
-	if steam_reflection_hrtf != null:
-		steam_reflection_hrtf.set("dry_gain", reflection_dry_gain if direct_path_enabled else 0.0)
-		steam_reflection_hrtf.set("wet_gain", db_to_linear(reflection_wet_db))
-
 @export_group("Emission Angle")
 ## Enables attenuation when the listener is outside the source's forward emission cone.
 @export var emission_angle_enabled := false
@@ -369,10 +190,7 @@ var effect_bus_index := -1
 var owns_effect_bus := false
 var steam_direct: AudioEffect
 var steam_hrtf: AudioEffect
-var steam_reflection_send: AudioEffect
-var steam_reflection_hrtf: AudioEffect
 var disable_doppler := false
-var _diagnostic_report_saved := false
 
 func _enter_tree() -> void:
 	# A class_name script added from Create Node does not instantiate the companion
@@ -432,10 +250,8 @@ func _get_active_player() -> Node:
 
 func _steam_effects_available() -> bool:
 	return (
-		ClassDB.class_exists("AudioEffectSteamReflectionSend")
-		and ClassDB.class_exists("AudioEffectSteamDirect")
+		ClassDB.class_exists("AudioEffectSteamDirect")
 		and ClassDB.class_exists("AudioEffectSteamSpatial")
-		and ClassDB.class_exists("AudioEffectSteamReflectionHRTF")
 	)
 
 func _choose_backend() -> SpatialBackend:
@@ -456,8 +272,8 @@ func get_spatial_capabilities() -> Dictionary:
 	return {
 		"backend": "steam_audio" if _active_backend == SpatialBackend.STEAM_AUDIO else "godot_native",
 		"hrtf": _active_backend == SpatialBackend.STEAM_AUDIO,
-		"reflections": _active_backend == SpatialBackend.STEAM_AUDIO,
-		"ambisonics": _active_backend == SpatialBackend.STEAM_AUDIO,
+		"reflections": false,
+		"ambisonics": false,
 	}
 
 ## Starts playback at [param from_position] seconds.
@@ -471,12 +287,10 @@ func play(from_position := 0.0) -> void:
 		# cannot move an already-running sample into the software bus mixer.
 		if _active_backend == SpatialBackend.STEAM_AUDIO:
 			player.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
-			# Effect resources begin with audible unity defaults. Prime the complete
+			# Effect resources begin with audible unity defaults. Prime the direct
 			# chain synchronously so the audio thread cannot render an initial block
 			# before the first physics update copies this player's authored state.
 			_update_spatialization()
-			if steam_reflection_hrtf != null:
-				steam_reflection_hrtf.call("diagnostic_event", 1 << 11) # EVENT_PLAY
 		player.play(from_position)
 
 ## Moves the playback position to [param to_position] seconds.
@@ -491,8 +305,6 @@ func stop() -> void:
 	_editor_resume_pending = false
 	var player := _get_active_player()
 	if player != null:
-		if _active_backend == SpatialBackend.STEAM_AUDIO and steam_reflection_hrtf != null:
-			steam_reflection_hrtf.call("diagnostic_event", 1 << 12) # EVENT_STOP
 		player.stop()
 
 ## Returns [code]true[/code] while audio is playing.
@@ -531,7 +343,7 @@ func begin_editor_preview(preview_bus: StringName) -> void:
 	if target_index < 0:
 		push_warning("Steam spatial effect bus '%s' does not exist" % target_bus)
 		return
-	if effect_bus_index != target_index or player == null or player.bus != target_bus or steam_reflection_send == null or steam_direct == null or steam_hrtf == null or steam_reflection_hrtf == null:
+	if effect_bus_index != target_index or player == null or player.bus != target_bus or steam_direct == null or steam_hrtf == null:
 		_attach_effect_bus(target_bus)
 
 func end_editor_preview() -> void:
@@ -544,8 +356,6 @@ func end_editor_preview() -> void:
 	effect_bus_index = -1
 	steam_direct = null
 	steam_hrtf = null
-	steam_reflection_send = null
-	steam_reflection_hrtf = null
 	notify_property_list_changed()
 
 func _apply_spatial_effect_bus_selection() -> void:
@@ -603,10 +413,8 @@ func _clear_effect_bus(remove_owned: bool) -> void:
 		player.bus = bus
 	effect_bus_name = &""
 	effect_bus_index = -1
-	steam_reflection_send = null
 	steam_direct = null
 	steam_hrtf = null
-	steam_reflection_hrtf = null
 	owns_effect_bus = false
 	if remove_owned and old_name != &"":
 		var old_index := AudioServer.get_bus_index(old_name)
@@ -618,10 +426,8 @@ func _attach_effect_bus(bus_name: StringName) -> void:
 	owns_effect_bus = false
 	effect_bus_name = bus_name
 	effect_bus_index = AudioServer.get_bus_index(bus_name)
-	steam_reflection_send = null
 	steam_direct = null
 	steam_hrtf = null
-	steam_reflection_hrtf = null
 	if effect_bus_index < 0:
 		push_warning("Steam spatial effect bus '%s' does not exist" % bus_name)
 		notify_property_list_changed()
@@ -631,22 +437,12 @@ func _attach_effect_bus(bus_name: StringName) -> void:
 		player.bus = bus_name
 	for effect_index in AudioServer.get_bus_effect_count(effect_bus_index):
 		var candidate := AudioServer.get_bus_effect(effect_bus_index, effect_index)
-		if candidate.get_class() == "AudioEffectSteamReflectionSend":
-			steam_reflection_send = candidate
-		elif candidate.get_class() == "AudioEffectSteamDirect":
+		if candidate.get_class() == "AudioEffectSteamDirect":
 			steam_direct = candidate
 		elif candidate.get_class() == "AudioEffectSteamSpatial":
 			steam_hrtf = candidate
-		elif candidate.get_class() == "AudioEffectSteamReflectionHRTF":
-			steam_reflection_hrtf = candidate
-	if steam_reflection_send == null or steam_direct == null or steam_hrtf == null or steam_reflection_hrtf == null:
-		push_warning("Bus '%s' needs Reflection Send, Steam Direct, Steam HRTF, then Reflection HRTF Return" % bus_name)
-	else:
-		steam_reflection_send.set("target", steam_reflection_hrtf)
-		steam_reflection_hrtf.set("diagnostic_source_identity", get_instance_id())
-		steam_reflection_hrtf.call("diagnostic_event", 1 << 10) # EVENT_BUS_ATTACHED
-		_diagnostic_report_saved = false
-		_push_reflection_parameters()
+	if steam_direct == null or steam_hrtf == null:
+		push_warning("Bus '%s' needs Steam Direct followed by Steam HRTF" % bus_name)
 	notify_property_list_changed()
 
 func _generated_effect_bus_name() -> StringName:
@@ -684,33 +480,22 @@ func _create_effect_bus(bus_name: StringName) -> void:
 	AudioServer.set_bus_send(effect_bus_index, bus)
 	player.bus = effect_bus_name
 
-	steam_reflection_hrtf = ClassDB.instantiate("AudioEffectSteamReflectionHRTF") as AudioEffect
-	steam_reflection_send = ClassDB.instantiate("AudioEffectSteamReflectionSend") as AudioEffect
 	steam_direct = ClassDB.instantiate("AudioEffectSteamDirect") as AudioEffect
 	steam_hrtf = ClassDB.instantiate("AudioEffectSteamSpatial") as AudioEffect
-	if steam_reflection_send == null or steam_direct == null or steam_hrtf == null or steam_reflection_hrtf == null:
+	if steam_direct == null or steam_hrtf == null:
 		push_error("Steam spatial effects are unavailable; build and load the GDExtension first")
 		return
-	steam_reflection_send.resource_name = "Reflection Send"
 	steam_direct.resource_name = "Direct Path"
 	steam_hrtf.resource_name = "HRTF Spatializer"
-	steam_reflection_hrtf.resource_name = "Reflection HRTF Return"
-	steam_reflection_send.set("target", steam_reflection_hrtf)
-	steam_reflection_hrtf.set("diagnostic_source_identity", get_instance_id())
-	steam_reflection_hrtf.call("diagnostic_event", 1 << 10) # EVENT_BUS_ATTACHED
-	_diagnostic_report_saved = false
-	AudioServer.add_bus_effect(effect_bus_index, steam_reflection_send)
 	AudioServer.add_bus_effect(effect_bus_index, steam_direct)
 	AudioServer.add_bus_effect(effect_bus_index, steam_hrtf)
-	AudioServer.add_bus_effect(effect_bus_index, steam_reflection_hrtf)
-	_push_reflection_parameters()
 	notify_property_list_changed()
 	if Engine.is_editor_hint():
 		# add_bus() refreshes the Audio dock immediately, before this function has
 		# populated the new bus. add_bus_effect() has no public change signal;
 		# Godot's own dock calls its private _update_bus() after adding an effect.
 		# Re-emit the public layout signal on the next idle step so the dock rebuilds
-		# once, after the complete four-effect chain is present.
+		# once, after the complete two-effect chain is present.
 		AudioServer.call_deferred("emit_signal", &"bus_layout_changed")
 
 func _bus_names_hint(include_construction_choices: bool) -> String:
@@ -742,14 +527,14 @@ func _get_native_audio_bus_hint() -> int:
 	return _native_audio_bus_hint
 
 func _get_property_list() -> Array[Dictionary]:
-	if steam_reflection_send == null or steam_direct == null or steam_hrtf == null or steam_reflection_hrtf == null:
+	if steam_direct == null or steam_hrtf == null:
 		return []
 	var properties: Array[Dictionary] = [{
 		"name": "Spatial Effect Bus Effects",
 		"type": TYPE_NIL,
 		"usage": PROPERTY_USAGE_GROUP,
 	}]
-	for property_name in [&"reflection_send_effect", &"direct_path_effect", &"hrtf_spatializer_effect", &"reflection_hrtf_effect"]:
+	for property_name in [&"direct_path_effect", &"hrtf_spatializer_effect"]:
 		properties.append({
 			"name": property_name,
 			"type": TYPE_OBJECT,
@@ -761,14 +546,10 @@ func _get_property_list() -> Array[Dictionary]:
 
 func _get(property: StringName) -> Variant:
 	match property:
-		&"reflection_send_effect":
-			return steam_reflection_send
 		&"direct_path_effect":
 			return steam_direct
 		&"hrtf_spatializer_effect":
 			return steam_hrtf
-		&"reflection_hrtf_effect":
-			return steam_reflection_hrtf
 	return null
 
 func _exit_tree() -> void:
@@ -779,7 +560,7 @@ func _exit_tree() -> void:
 		AudioServer.remove_bus(current_index)
 
 func _update_spatialization() -> void:
-	if steam_reflection_send == null or steam_direct == null or steam_hrtf == null or steam_reflection_hrtf == null:
+	if steam_direct == null or steam_hrtf == null:
 		return
 	# Always replace the native effects' audible unity defaults, even before a
 	# listener exists. Listener-derived values below refine these safe authored
@@ -793,14 +574,7 @@ func _update_spatialization() -> void:
 	steam_direct.set("distance_attenuation", 1.0)
 	steam_direct.set("air_absorption", Vector3.ONE)
 	steam_direct.set("directivity", 1.0)
-	steam_hrtf.call("set_source_parameters", Vector3(0.0, 0.0, -1.0), source_gain, spatial_blend)
-	steam_reflection_send.set("enabled", reflections_enabled)
-	steam_reflection_send.set("send_gain", source_gain * db_to_linear(reflection_send_db))
-	steam_reflection_send.set("reverb_times", reflection_reverb_times)
-	if _reflection_field_dirty:
-		_push_reflection_parameters()
-	steam_reflection_hrtf.set("dry_gain", reflection_dry_gain if direct_path_enabled else 0.0)
-	steam_reflection_hrtf.call("set_listener_parameters", Basis.IDENTITY, db_to_linear(reflection_wet_db))
+	steam_hrtf.call("set_spatial_parameters", global_position, Vector3.ZERO, Quaternion(), source_gain, spatial_blend)
 	var audio_player := _get_audio_player()
 	if audio_player != null:
 		audio_player.pitch_scale = _pitch_scale
@@ -811,7 +585,6 @@ func _update_spatialization() -> void:
 
 	var local_position: Vector3 = listener.global_transform.orthonormalized().affine_inverse() * global_position
 	var distance := local_position.length()
-	var direction := local_position.normalized() if distance > CMP_EPSILON else Vector3(0.0, 0.0, -1.0)
 	var source_directivity := 1.0
 	if emission_angle_enabled and distance > CMP_EPSILON:
 		var source_to_listener := listener.global_position - global_position
@@ -843,22 +616,13 @@ func _update_spatialization() -> void:
 
 	if max_distance > 0.0:
 		source_gain *= maxf(0.0, 1.0 - distance / max_distance)
-	steam_reflection_send.set("enabled", reflections_enabled)
-	# Parametric presets contain no propagation loss of their own, so feed them
-	# with the direct-path distance law. A baked field already contains the loss
-	# for its authored source/probe pair; applying that law again would attenuate
-	# it twice. The field remains a fixed snapshot until a future probe module
-	# selects a new one for the current positions.
-	var reflection_distance_attenuation := distance_attenuation if reflection_energy_field.is_empty() else 1.0
-	steam_reflection_send.set(
-			"send_gain",
-			source_gain * reflection_distance_attenuation * db_to_linear(reflection_send_db))
-	steam_reflection_send.set("reverb_times", reflection_reverb_times)
-	steam_reflection_hrtf.call(
-			"set_listener_parameters",
-			listener.global_basis.orthonormalized(),
-			db_to_linear(reflection_wet_db))
-	steam_hrtf.call("set_source_parameters", direction, source_gain, spatial_blend)
+	steam_hrtf.call(
+			"set_spatial_parameters",
+			global_position,
+			listener.global_position,
+			listener.global_basis.orthonormalized().get_rotation_quaternion(),
+			source_gain,
+			spatial_blend)
 	_update_doppler(listener, local_position, source_gain)
 
 func _get_spatial_listener() -> Node3D:
@@ -942,7 +706,6 @@ func _update_doppler(listener: Node3D, local_position: Vector3, weight: float) -
 		player.pitch_scale = actual_pitch
 
 func _physics_process(_delta: float) -> void:
-	_save_diagnostic_report_if_ready()
 	if Engine.is_editor_hint():
 		var current_bus_hint := _bus_names_hint(true)
 		if current_bus_hint != _bus_hint_cache:
@@ -962,10 +725,8 @@ func _physics_process(_delta: float) -> void:
 			selected_bus_index >= 0
 			and (
 				effect_bus_index != selected_bus_index
-				or steam_reflection_send == null
 				or steam_direct == null
 				or steam_hrtf == null
-				or steam_reflection_hrtf == null
 			)
 		):
 			_attach_effect_bus(_spatial_effect_bus)
@@ -992,42 +753,3 @@ func _physics_process(_delta: float) -> void:
 	if not Engine.is_editor_hint() and $VelocityTracker3D.doppler_tracking != doppler_tracking:
 		$VelocityTracker3D._update_dopper_tracking()
 	_update_spatialization()
-
-func _save_diagnostic_report_if_ready() -> void:
-	if _diagnostic_report_saved:
-		return
-	var stages := {
-		"direct_path": steam_direct,
-		"hrtf_spatializer": steam_hrtf,
-		"reflection_chain": steam_reflection_hrtf,
-	}
-	var report := {
-		"format": "steam_audio_pipeline_fault_v2",
-		"player_instance_id": get_instance_id(),
-		"reflection_preset": reflection_preset,
-		"reflection_send_db": reflection_send_db,
-		"reflection_wet_db": reflection_wet_db,
-		"direct_path_enabled": direct_path_enabled,
-		"stages": {},
-	}
-	var any_ready := false
-	for stage_name: String in stages:
-		var effect: AudioEffect = stages[stage_name]
-		if effect == null or not effect.has_method("is_diagnostic_capture_ready"):
-			continue
-		if effect.call("is_diagnostic_capture_ready"):
-			any_ready = true
-			report.stages[stage_name] = effect.call("get_diagnostic_report")
-	if not any_ready:
-		return
-	_diagnostic_report_saved = true
-	var path := "user://steam_audio_pipeline_fault_%d_%d.txt" % [get_instance_id(), Time.get_ticks_msec()]
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	if file == null:
-		push_error("Steam reflection diagnostic triggered but could not open %s" % path)
-		return
-	# var_to_str preserves NaN/Inf spellings and PackedFloat32Array snippets;
-	# JSON cannot faithfully represent those exact fault values.
-	file.store_string(var_to_str(report))
-	file.close()
-	push_error("Steam Audio overload captured without modifying audio: %s" % ProjectSettings.globalize_path(path))

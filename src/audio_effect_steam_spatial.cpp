@@ -6,6 +6,7 @@
 #include <godot_cpp/classes/audio_server.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/print_string.hpp>
+#include <godot_cpp/variant/basis.hpp>
 
 namespace godot {
 
@@ -16,14 +17,42 @@ Ref<AudioEffectInstance> AudioEffectSteamSpatial::_instantiate() {
 	return instance;
 }
 
-void AudioEffectSteamSpatial::set_direction(const Vector3 &value) {
-	direction = value.length_squared() > 0.000001f ? value.normalized() : Vector3(0.0f, 0.0f, -1.0f);
-	parameters->direction_x.store(direction.x, std::memory_order_relaxed);
-	parameters->direction_y.store(direction.y, std::memory_order_relaxed);
-	parameters->direction_z.store(direction.z, std::memory_order_release);
+static void store_spatial_transform(const std::shared_ptr<AudioEffectSteamSpatial::Parameters> &parameters,
+		const Vector3 &source, const Vector3 &receiver, const Quaternion &orientation) {
+	parameters->transform_sequence.fetch_add(1, std::memory_order_acq_rel);
+	parameters->source_x.store(source.x, std::memory_order_relaxed);
+	parameters->source_y.store(source.y, std::memory_order_relaxed);
+	parameters->source_z.store(source.z, std::memory_order_relaxed);
+	parameters->receiver_x.store(receiver.x, std::memory_order_relaxed);
+	parameters->receiver_y.store(receiver.y, std::memory_order_relaxed);
+	parameters->receiver_z.store(receiver.z, std::memory_order_relaxed);
+	parameters->receiver_qx.store(orientation.x, std::memory_order_relaxed);
+	parameters->receiver_qy.store(orientation.y, std::memory_order_relaxed);
+	parameters->receiver_qz.store(orientation.z, std::memory_order_relaxed);
+	parameters->receiver_qw.store(orientation.w, std::memory_order_relaxed);
+	parameters->transform_sequence.fetch_add(1, std::memory_order_release);
 }
 
-Vector3 AudioEffectSteamSpatial::get_direction() const { return direction; }
+void AudioEffectSteamSpatial::set_source_position(const Vector3 &value) {
+	source_position = value;
+	store_spatial_transform(parameters, source_position, receiver_position, receiver_orientation);
+}
+
+Vector3 AudioEffectSteamSpatial::get_source_position() const { return source_position; }
+
+void AudioEffectSteamSpatial::set_receiver_position(const Vector3 &value) {
+	receiver_position = value;
+	store_spatial_transform(parameters, source_position, receiver_position, receiver_orientation);
+}
+
+Vector3 AudioEffectSteamSpatial::get_receiver_position() const { return receiver_position; }
+
+void AudioEffectSteamSpatial::set_receiver_orientation(const Quaternion &value) {
+	receiver_orientation = value.length_squared() > 0.000001f ? value.normalized() : Quaternion();
+	store_spatial_transform(parameters, source_position, receiver_position, receiver_orientation);
+}
+
+Quaternion AudioEffectSteamSpatial::get_receiver_orientation() const { return receiver_orientation; }
 
 void AudioEffectSteamSpatial::set_gain(float value) {
 	gain = std::max(value, 0.0f);
@@ -49,8 +78,12 @@ void AudioEffectSteamSpatial::set_interpolation(Interpolation value) {
 
 AudioEffectSteamSpatial::Interpolation AudioEffectSteamSpatial::get_interpolation() const { return interpolation; }
 
-void AudioEffectSteamSpatial::set_source_parameters(const Vector3 &source_direction, float source_gain, float source_spatial_blend) {
-	set_direction(source_direction);
+void AudioEffectSteamSpatial::set_spatial_parameters(const Vector3 &source_global_position, const Vector3 &receiver_global_position,
+		const Quaternion &receiver_global_orientation, float source_gain, float source_spatial_blend) {
+	source_position = source_global_position;
+	receiver_position = receiver_global_position;
+	receiver_orientation = receiver_global_orientation.length_squared() > 0.000001f ? receiver_global_orientation.normalized() : Quaternion();
+	store_spatial_transform(parameters, source_position, receiver_position, receiver_orientation);
 	set_gain(source_gain);
 	set_spatial_blend(source_spatial_blend);
 }
@@ -80,10 +113,9 @@ Dictionary AudioEffectSteamSpatial::get_diagnostic_report() const {
 	report["output_finite"] = parameters->diagnostic_output_finite.load(std::memory_order_relaxed);
 	report["gain"] = parameters->gain.load(std::memory_order_relaxed);
 	report["spatial_blend"] = parameters->spatial_blend.load(std::memory_order_relaxed);
-	report["direction"] = Vector3(
-			parameters->direction_x.load(std::memory_order_relaxed),
-			parameters->direction_y.load(std::memory_order_relaxed),
-			parameters->direction_z.load(std::memory_order_relaxed));
+	report["source_position"] = source_position;
+	report["receiver_position"] = receiver_position;
+	report["receiver_orientation"] = receiver_orientation;
 	return report;
 }
 
@@ -92,22 +124,28 @@ void AudioEffectSteamSpatial::reset_diagnostic_capture() {
 }
 
 void AudioEffectSteamSpatial::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_direction", "direction"), &AudioEffectSteamSpatial::set_direction);
-	ClassDB::bind_method(D_METHOD("get_direction"), &AudioEffectSteamSpatial::get_direction);
+	ClassDB::bind_method(D_METHOD("set_source_position", "source_position"), &AudioEffectSteamSpatial::set_source_position);
+	ClassDB::bind_method(D_METHOD("get_source_position"), &AudioEffectSteamSpatial::get_source_position);
+	ClassDB::bind_method(D_METHOD("set_receiver_position", "receiver_position"), &AudioEffectSteamSpatial::set_receiver_position);
+	ClassDB::bind_method(D_METHOD("get_receiver_position"), &AudioEffectSteamSpatial::get_receiver_position);
+	ClassDB::bind_method(D_METHOD("set_receiver_orientation", "receiver_orientation"), &AudioEffectSteamSpatial::set_receiver_orientation);
+	ClassDB::bind_method(D_METHOD("get_receiver_orientation"), &AudioEffectSteamSpatial::get_receiver_orientation);
 	ClassDB::bind_method(D_METHOD("set_gain", "gain"), &AudioEffectSteamSpatial::set_gain);
 	ClassDB::bind_method(D_METHOD("get_gain"), &AudioEffectSteamSpatial::get_gain);
 	ClassDB::bind_method(D_METHOD("set_spatial_blend", "spatial_blend"), &AudioEffectSteamSpatial::set_spatial_blend);
 	ClassDB::bind_method(D_METHOD("get_spatial_blend"), &AudioEffectSteamSpatial::get_spatial_blend);
 	ClassDB::bind_method(D_METHOD("set_interpolation", "interpolation"), &AudioEffectSteamSpatial::set_interpolation);
 	ClassDB::bind_method(D_METHOD("get_interpolation"), &AudioEffectSteamSpatial::get_interpolation);
-	ClassDB::bind_method(D_METHOD("set_source_parameters", "direction", "gain", "spatial_blend"), &AudioEffectSteamSpatial::set_source_parameters, DEFVAL(1.0f));
+	ClassDB::bind_method(D_METHOD("set_spatial_parameters", "source_position", "receiver_position", "receiver_orientation", "gain", "spatial_blend"), &AudioEffectSteamSpatial::set_spatial_parameters, DEFVAL(1.0f));
 	ClassDB::bind_method(D_METHOD("set_diagnostic_trigger_peak", "peak"), &AudioEffectSteamSpatial::set_diagnostic_trigger_peak);
 	ClassDB::bind_method(D_METHOD("get_diagnostic_trigger_peak"), &AudioEffectSteamSpatial::get_diagnostic_trigger_peak);
 	ClassDB::bind_method(D_METHOD("is_diagnostic_capture_ready"), &AudioEffectSteamSpatial::is_diagnostic_capture_ready);
 	ClassDB::bind_method(D_METHOD("get_diagnostic_report"), &AudioEffectSteamSpatial::get_diagnostic_report);
 	ClassDB::bind_method(D_METHOD("reset_diagnostic_capture"), &AudioEffectSteamSpatial::reset_diagnostic_capture);
 
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "direction"), "set_direction", "get_direction");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "source_position"), "set_source_position", "get_source_position");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "receiver_position"), "set_receiver_position", "get_receiver_position");
+	ADD_PROPERTY(PropertyInfo(Variant::QUATERNION, "receiver_orientation"), "set_receiver_orientation", "get_receiver_orientation");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gain", PROPERTY_HINT_RANGE, "0,4,0.001,or_greater"), "set_gain", "get_gain");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spatial_blend", PROPERTY_HINT_RANGE, "0,1,0.001"), "set_spatial_blend", "get_spatial_blend");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "interpolation", PROPERTY_HINT_ENUM, "Nearest,Bilinear"), "set_interpolation", "get_interpolation");
@@ -215,19 +253,27 @@ void AudioEffectSteamSpatialInstance::_process(const void *src_buffer, AudioFram
 		if (std::isfinite(mono[i])) mono_peak = std::max(mono_peak, std::abs(mono[i]));
 	}
 
-	IPLVector3 direction{
-		parameters->direction_x.load(std::memory_order_relaxed),
-		parameters->direction_y.load(std::memory_order_relaxed),
-		parameters->direction_z.load(std::memory_order_acquire),
-	};
-	const float length = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
-	if (length > 0.000001f) {
-		direction.x /= length;
-		direction.y /= length;
-		direction.z /= length;
-	} else {
-		direction = { 0.0f, 0.0f, -1.0f };
+	// Never spin or lock on the audio thread. If the main thread is in the
+	// middle of publishing a transform, retain the last coherent snapshot for
+	// one block and pick up the new state on the next callback.
+	const uint32_t sequence_before = parameters->transform_sequence.load(std::memory_order_acquire);
+	if (!(sequence_before & 1U)) {
+		const Vector3 source_candidate(parameters->source_x.load(std::memory_order_relaxed), parameters->source_y.load(std::memory_order_relaxed), parameters->source_z.load(std::memory_order_relaxed));
+		const Vector3 receiver_candidate(parameters->receiver_x.load(std::memory_order_relaxed), parameters->receiver_y.load(std::memory_order_relaxed), parameters->receiver_z.load(std::memory_order_relaxed));
+		const Quaternion orientation_candidate(parameters->receiver_qx.load(std::memory_order_relaxed), parameters->receiver_qy.load(std::memory_order_relaxed), parameters->receiver_qz.load(std::memory_order_relaxed), parameters->receiver_qw.load(std::memory_order_relaxed));
+		if (parameters->transform_sequence.load(std::memory_order_acquire) == sequence_before) {
+			last_source_position = source_candidate;
+			last_receiver_position = receiver_candidate;
+			last_receiver_orientation = orientation_candidate;
+		}
 	}
+	Vector3 listener_direction = last_source_position - last_receiver_position;
+	if (listener_direction.length_squared() > 0.000001f) {
+		listener_direction = Basis(last_receiver_orientation.inverse()).xform(listener_direction.normalized());
+	} else {
+		listener_direction = Vector3(0.0f, 0.0f, -1.0f);
+	}
+	IPLVector3 direction{ listener_direction.x, listener_direction.y, listener_direction.z };
 
 	IPLBinauralEffectParams effect_parameters{};
 	effect_parameters.direction = direction;

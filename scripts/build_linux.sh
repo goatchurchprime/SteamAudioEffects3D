@@ -5,7 +5,7 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 steam_source="$repo_dir/thirdparty/steam-audio/core"
 steam_build="$repo_dir/build/steam-audio/cmake"
 steam_install="$repo_dir/build/steam-audio/install"
-addon_bin="$repo_dir/addons/steam_spatial/bin"
+addon_bin="$repo_dir/addons/steam_spatial/bin/linux-x86_64"
 
 for required in PFFFT_INCLUDE_DIR PFFFT_LIBRARY MYSOFA_INCLUDE_DIR MYSOFA_LIBRARY ZLIB_INCLUDE_DIR ZLIB_LIBRARY FLATBUFFERS_INCLUDE_DIR FLATBUFFERS_EXECUTABLE; do
     if [[ -z "${!required:-}" ]]; then
@@ -42,7 +42,12 @@ install -Dm644 "$steam_build/src/core/phonon_version.h" "$steam_install/include/
 cmake -E remove_directory "$repo_dir/thirdparty/steam-audio/unity/lib"
 
 cd "$repo_dir"
-STEAM_AUDIO_ROOT="$steam_install" scons platform=linux target=template_debug use_static_cpp=false -j2
+mkdir -p "$addon_bin"
+for target in template_debug template_release; do
+    STEAM_AUDIO_ROOT="$steam_install" \
+    STEAM_SPATIAL_OUTPUT_DIR="$addon_bin" \
+    scons platform=linux arch=x86_64 target="$target" use_static_cpp=false -j2
+done
 install -Dm755 "$steam_install/lib/libphonon.so" "$addon_bin/libphonon.so"
 
 echo "Built Steam Audio and the GDExtension in $addon_bin"

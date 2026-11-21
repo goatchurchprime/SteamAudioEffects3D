@@ -35,7 +35,7 @@ func _run() -> void:
 	assert(private_player.bus == quality.spatial_effect_bus, "Construct Now must route the private player")
 	assert(quality.spatial_effect_bus == quality._generated_effect_bus_name(), "A constructed editor bus must carry this player's stable scene/node identity")
 	var constructed_properties := quality.get_property_list()
-	for effect_property in [&"reflection_send_effect", &"direct_path_effect", &"hrtf_spatializer_effect", &"reflection_hrtf_effect"]:
+	for effect_property in [&"direct_path_effect", &"hrtf_spatializer_effect"]:
 		var matches := constructed_properties.filter(func(property): return property.name == effect_property)
 		assert(matches.size() == 1, "Constructed spatial bus must expose %s in the Inspector" % effect_property)
 		assert(matches[0].usage & PROPERTY_USAGE_READ_ONLY, "%s must be a read-only live reference" % effect_property)
@@ -47,11 +47,6 @@ func _run() -> void:
 			break
 		await create_timer(0.1).timeout
 	assert(private_player.get_playback_position() > 0.05, "The minimal editor QPlayer must advance playback")
-	quality.apply_reflection_preset(AudioStreamQPlayer3D.ReflectionPreset.EXAGGERATED_CAVERN)
-	await physics_frame
-	await physics_frame
-	assert(quality.steam_reflection_send.enabled)
-	assert(quality.steam_reflection_send.reverb_times == Vector3(5.0, 4.0, 3.0))
 	# A minimal scene has no AudioListener3D. Its tool preview must therefore use
 	# the 3D editor camera, not the otherwise unrelated edited-scene viewport.
 	var editor_camera := EditorInterface.get_editor_viewport_3d(0).get_camera_3d()
@@ -59,13 +54,11 @@ func _run() -> void:
 	var saved_camera_transform := editor_camera.global_transform
 	editor_camera.global_transform = Transform3D(Basis.IDENTITY, quality.global_position - Vector3(5.0, 0.0, 0.0))
 	quality._update_spatialization()
-	assert(quality.steam_hrtf.direction.x > 0.99, "Editor camera left of source must render right, got %s" % quality.steam_hrtf.direction)
-	var near_reflection_send: float = quality.steam_reflection_send.send_gain
+	assert(quality.steam_hrtf.source_position == quality.global_position)
+	assert(quality.steam_hrtf.receiver_position == editor_camera.global_position)
 	editor_camera.global_transform = Transform3D(Basis.IDENTITY, quality.global_position + Vector3(20.0, 0.0, 0.0))
 	quality._update_spatialization()
-	assert(quality.steam_hrtf.direction.x < -0.99, "Editor camera right of source must render left, got %s" % quality.steam_hrtf.direction)
-	assert(is_equal_approx(quality.steam_reflection_send.send_gain, near_reflection_send * 0.5),
-			"Reflection preset send must follow inverse-distance attenuation")
+	assert(quality.steam_hrtf.receiver_position == editor_camera.global_position)
 	editor_camera.global_transform = saved_camera_transform
 	var bus_index := AudioServer.get_bus_index(quality.spatial_effect_bus)
 	var effect_peak := -200.0

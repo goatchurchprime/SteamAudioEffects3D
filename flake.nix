@@ -17,14 +17,18 @@
       default = pkgs.mkShell {
         packages = with pkgs; [
           cmake
+          curl
           flatbuffers
           gcc
           godot_4
           libmysofa
           ninja
+          patchelf
           pffft
           pkg-config
           scons
+          unzip
+          zip
           zlib
         ];
 

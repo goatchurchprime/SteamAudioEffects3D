@@ -2,11 +2,13 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
 #include <godot_cpp/classes/audio_effect.hpp>
 #include <godot_cpp/classes/audio_effect_instance.hpp>
+#include <godot_cpp/variant/quaternion.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
@@ -26,9 +28,17 @@ public:
 	};
 
 	struct Parameters {
-		std::atomic<float> direction_x{ 0.0f };
-		std::atomic<float> direction_y{ 0.0f };
-		std::atomic<float> direction_z{ -1.0f };
+		std::atomic<uint32_t> transform_sequence{ 0 };
+		std::atomic<float> source_x{ 0.0f };
+		std::atomic<float> source_y{ 0.0f };
+		std::atomic<float> source_z{ -1.0f };
+		std::atomic<float> receiver_x{ 0.0f };
+		std::atomic<float> receiver_y{ 0.0f };
+		std::atomic<float> receiver_z{ 0.0f };
+		std::atomic<float> receiver_qx{ 0.0f };
+		std::atomic<float> receiver_qy{ 0.0f };
+		std::atomic<float> receiver_qz{ 0.0f };
+		std::atomic<float> receiver_qw{ 1.0f };
 		std::atomic<float> gain{ 1.0f };
 		std::atomic<float> spatial_blend{ 1.0f };
 		std::atomic<int> interpolation{ INTERPOLATION_BILINEAR };
@@ -43,7 +53,9 @@ public:
 
 private:
 	std::shared_ptr<Parameters> parameters = std::make_shared<Parameters>();
-	Vector3 direction{ 0.0f, 0.0f, -1.0f };
+	Vector3 source_position{ 0.0f, 0.0f, -1.0f };
+	Vector3 receiver_position{ 0.0f, 0.0f, 0.0f };
+	Quaternion receiver_orientation;
 	float gain = 1.0f;
 	float spatial_blend = 1.0f;
 	Interpolation interpolation = INTERPOLATION_BILINEAR;
@@ -54,15 +66,20 @@ protected:
 public:
 	Ref<AudioEffectInstance> _instantiate() override;
 
-	void set_direction(const Vector3 &value);
-	Vector3 get_direction() const;
+	void set_source_position(const Vector3 &value);
+	Vector3 get_source_position() const;
+	void set_receiver_position(const Vector3 &value);
+	Vector3 get_receiver_position() const;
+	void set_receiver_orientation(const Quaternion &value);
+	Quaternion get_receiver_orientation() const;
 	void set_gain(float value);
 	float get_gain() const;
 	void set_spatial_blend(float value);
 	float get_spatial_blend() const;
 	void set_interpolation(Interpolation value);
 	Interpolation get_interpolation() const;
-	void set_source_parameters(const Vector3 &source_direction, float source_gain, float source_spatial_blend = 1.0f);
+	void set_spatial_parameters(const Vector3 &source_global_position, const Vector3 &receiver_global_position,
+			const Quaternion &receiver_global_orientation, float source_gain, float source_spatial_blend = 1.0f);
 	void set_diagnostic_trigger_peak(float value);
 	float get_diagnostic_trigger_peak() const;
 	bool is_diagnostic_capture_ready() const;
@@ -84,6 +101,9 @@ class AudioEffectSteamSpatialInstance : public AudioEffectInstance {
 	int32_t sampling_rate = 0;
 	int32_t processing_frame_size = 0;
 	bool configured = false;
+	Vector3 last_source_position{ 0.0f, 0.0f, -1.0f };
+	Vector3 last_receiver_position;
+	Quaternion last_receiver_orientation;
 
 	void release_steam_audio();
 	bool ensure_processing_size(int32_t frame_count);

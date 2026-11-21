@@ -5,7 +5,7 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 steam_source="$repo_dir/thirdparty/steam-audio/core"
 steam_build="$repo_dir/build/steam-audio-arm64/cmake"
 steam_install="$repo_dir/build/steam-audio-arm64/install"
-addon_bin="$repo_dir/addons/steam_spatial/bin/arm64"
+addon_bin="$repo_dir/addons/steam_spatial/bin/linux-arm64"
 
 for required in CROSS_CC CROSS_CXX CROSS_AR PFFFT_INCLUDE_DIR PFFFT_LIBRARY MYSOFA_INCLUDE_DIR MYSOFA_LIBRARY ZLIB_INCLUDE_DIR ZLIB_LIBRARY FLATBUFFERS_INCLUDE_DIR FLATBUFFERS_EXECUTABLE; do
     if [[ -z "${!required:-}" ]]; then
@@ -55,8 +55,10 @@ for target in template_debug template_release; do
         -j2
 done
 install -Dm755 "$steam_install/lib/libphonon.so" "$addon_bin/libphonon.so"
+# shellcheck disable=SC2016 # The loader, not this shell, expands $ORIGIN.
 patchelf --set-rpath '$ORIGIN' "$addon_bin/libphonon.so"
 for extension in "$addon_bin"/libsteam_spatial.linux.*.arm64.so; do
+    # shellcheck disable=SC2016
     patchelf --set-rpath '$ORIGIN' "$extension"
 done
 

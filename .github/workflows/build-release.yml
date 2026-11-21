@@ -1,0 +1,139 @@
+name: Build and release addon
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-native-platforms:
+    name: Build ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86-64
+            os: ubuntu-22.04
+            platform: linux
+            arch: x86_64
+            artifact: linux-x86_64
+          - name: Windows x86-64
+            os: windows-2022
+            platform: windows
+            arch: x86_64
+            artifact: windows-x86_64
+          - name: macOS universal
+            os: macos-14
+            platform: macos
+            arch: universal
+            artifact: macos
+          - name: Android ARM64
+            os: windows-2022
+            platform: android
+            arch: arm64
+            artifact: android-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install SCons
+        run: python -m pip install scons
+      - name: Install Linux tools
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake patchelf
+      - name: Configure MSVC
+        if: matrix.platform == 'windows' || matrix.platform == 'android'
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Install Android NDK
+        if: matrix.platform == 'android'
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+      - name: Build extension
+        shell: bash
+        env:
+          ANDROID_NDK: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: scripts/build_native_source.sh "${{ matrix.platform }}" "${{ matrix.arch }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.artifact }}
+          path: addons/steam_spatial/bin/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  build-linux-arm64:
+    name: Build Linux ARM64 (Steam Frame)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: cachix/install-nix-action@v30
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build extension and Steam Audio
+        run: nix develop .#steam-frame --command scripts/build_steam_frame.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-linux-arm64
+          path: addons/steam_spatial/bin/linux-arm64
+          if-no-files-found: error
+
+  package:
+    name: Package addon
+    needs: [build-native-platforms, build-linux-arm64]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-linux-x86_64
+          path: addons/steam_spatial/bin/linux-x86_64
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-linux-arm64
+          path: addons/steam_spatial/bin/linux-arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-windows-x86_64
+          path: addons/steam_spatial/bin/windows-x86_64
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-macos
+          path: addons/steam_spatial/bin/macos
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-android-arm64
+          path: addons/steam_spatial/bin/android-arm64
+      - name: Build addon archive
+        run: |
+          version="${GITHUB_REF_NAME:-development}"
+          scripts/package_release.sh "$version"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: steam-audio-effects-3d
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/*.zip dist/*.sha256 \
+            --verify-tag \
+            --generate-notes \
+            --title "SteamAudioEffects3D $GITHUB_REF_NAME"

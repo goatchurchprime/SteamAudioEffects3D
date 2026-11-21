@@ -1,7 +1,9 @@
 # Steam Audio effects and environmental analysis
 
-The addon currently exposes four independent render effects. They consume acoustic
-parameters; they do not own a world representation or probe Godot geometry.
+The direct-only release exposes two independent render effects. They consume
+acoustic parameters; they do not own a world representation or probe Godot
+geometry. Reflection implementation notes below are retained as deferred design
+history, but those classes are not compiled or registered in this release.
 
 ## AudioEffectSteamDirect
 
@@ -47,16 +49,22 @@ Audio's built-in HRTF:
 
 | Property | Meaning |
 | --- | --- |
-| `direction` | Listener-local unit vector from listener to source |
+| `source_position` | Source position in global coordinates |
+| `receiver_position` | Listener position in the same global coordinates |
+| `receiver_orientation` | Listener global orientation quaternion |
 | `gain` | Nonnegative pre-HRTF linear gain supplied by this integration |
 | `spatial_blend` | Blend from unspatialized mono (`0`) to full HRTF (`1`) |
 | `interpolation` | Nearest measurement or smoother, costlier bilinear HRTF lookup |
 
-`set_source_parameters()` updates direction, gain, and blend together. The
-effect folds stereo input to mono before rendering; `spatial_blend = 0` therefore
-does not recover the original stereo image.
+`set_spatial_parameters()` updates the two positions, orientation, gain, and
+blend together. The effect derives the listener-local unit direction required
+by `IPLBinauralEffect` internally. It folds stereo input to mono before
+rendering; `spatial_blend = 0` therefore does not recover the original stereo
+image.
 
-## AudioEffectSteamReflectionSend
+## Deferred reflection experiment (not compiled)
+
+### AudioEffectSteamReflectionSend
 
 `AudioEffectSteamReflectionSend` is a normal pass-through bus effect with one
 additional relationship: its `target` is an
@@ -89,7 +97,7 @@ The field producer is intentionally separate. Presets, procedural room models,
 baked assets, or a future geometry simulation can all load the same stable
 render interface without changing the Godot bus arrangement.
 
-## AudioEffectSteamReflectionHRTF
+### AudioEffectSteamReflectionHRTF
 
 `AudioEffectSteamReflectionHRTF` belongs after the point-source HRTF. It accepts
 the dry stereo signal through the ordinary effect chain, retrieves accumulated
@@ -110,6 +118,11 @@ Reflection Send -> Direct -> Point HRTF -> Reflection HRTF Return
        |                                      ^
        +-------- native Ambisonic submit -----+
 ```
+
+A deferred design adds a propagation-delay effect before this stack and carries
+historical source state to the downstream effects. It also proposes an indexed
+rack of immutable, precomputed energy fields and a crater missile VR
+demonstration. See [Propagation delay and spatial history](PROPAGATION_DELAY_DESIGN.md).
 
 ## What these parameters do not cover
 

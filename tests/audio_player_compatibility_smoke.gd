@@ -23,9 +23,6 @@ func _run() -> void:
 		"panning_strength", "bus", "playback_type", "emission_angle_enabled",
 		"emission_angle_degrees", "emission_angle_filter_attenuation_db",
 		"attenuation_filter_cutoff_hz", "attenuation_filter_db", "doppler_tracking",
-		"reflection_preset", "reflections_enabled", "reflection_send_db",
-		"reflection_reverb_times", "reflection_energy_field_duration", "reflection_energy_field",
-		"direct_path_enabled", "reflection_dry_gain", "reflection_wet_db",
 	]:
 		assert(available_properties.has(property_name), "Missing AudioStreamPlayer3D-compatible property: %s" % property_name)
 
@@ -34,32 +31,19 @@ func _run() -> void:
 	assert(internal_player.max_polyphony == 3, "The wrapper polyphony must reach the private player")
 	assert(internal_player.playback_type == AudioServer.PLAYBACK_TYPE_STREAM, "Playback type must reach the private player")
 	player.playback_type = AudioServer.PLAYBACK_TYPE_SAMPLE
-	assert(player.playback_type == AudioServer.PLAYBACK_TYPE_STREAM, "Effect-based playback must reject the out-of-engine sample path")
+	assert(player.playback_type == AudioServer.PLAYBACK_TYPE_SAMPLE, "The public playback choice must remain available to the native/Web fallback")
 	assert(internal_player.playback_type == AudioServer.PLAYBACK_TYPE_STREAM, "The private player must remain in Godot's stream mixer")
+	assert(player.get_node("GodotAudioStreamPlayer3D").playback_type == AudioServer.PLAYBACK_TYPE_SAMPLE)
 	assert(is_equal_approx(player.volume_db, linear_to_db(0.5)), "volume_linear must alias volume_db")
-	player.apply_reflection_preset(player.ReflectionPreset.STONE_TUNNEL)
-	assert(player.reflections_enabled)
-	assert(player.reflection_reverb_times == Vector3(3.2, 2.7, 2.0))
-	assert(is_equal_approx(player.reflection_send_db, -10.0))
-
 	var private_bus_index := AudioServer.get_bus_index(internal_player.bus)
 	assert(private_bus_index >= 0, "The player must create its private bus")
-	assert(AudioServer.get_bus_effect_count(private_bus_index) == 4)
-	assert(AudioServer.get_bus_effect(private_bus_index, 0).get_class() == "AudioEffectSteamReflectionSend")
-	assert(AudioServer.get_bus_effect(private_bus_index, 1).get_class() == "AudioEffectSteamDirect")
-	assert(AudioServer.get_bus_effect(private_bus_index, 2).get_class() == "AudioEffectSteamSpatial")
-	assert(AudioServer.get_bus_effect(private_bus_index, 3).get_class() == "AudioEffectSteamReflectionHRTF")
-	assert(AudioServer.get_bus_effect(private_bus_index, 0).target == AudioServer.get_bus_effect(private_bus_index, 3))
-	player.direct_path_enabled = false
+	assert(AudioServer.get_bus_effect_count(private_bus_index) == 2)
+	assert(AudioServer.get_bus_effect(private_bus_index, 0).get_class() == "AudioEffectSteamDirect")
+	assert(AudioServer.get_bus_effect(private_bus_index, 1).get_class() == "AudioEffectSteamSpatial")
 	player._update_spatialization()
-	assert(AudioServer.get_bus_effect(private_bus_index, 3).dry_gain == 0.0,
-			"Direct-path monitoring switch must leave only the wet reflection return")
-	player.direct_path_enabled = true
-	player.apply_reflection_preset(player.ReflectionPreset.ABSORBENT_WALL)
-	var reflection_effect = AudioServer.get_bus_effect(private_bus_index, 0)
-	assert(player.reflection_energy_field.size() == 4 * 3 * reflection_effect.get_energy_field_bin_count())
-	assert(reflection_effect.energy_field.size() == player.reflection_energy_field.size())
-	for effect_index in 4:
+	var spatial_effect := AudioServer.get_bus_effect(private_bus_index, 1)
+	assert(spatial_effect.source_position == player.global_position)
+	for effect_index in 2:
 		assert(AudioServer.is_bus_effect_enabled(private_bus_index, effect_index))
 
 	player.play()

@@ -1,5 +1,4 @@
 #include "audio_effect_steam_direct.hpp"
-#include "audio_effect_steam_reflection.hpp"
 #include "audio_effect_steam_spatial.hpp"
 
 #include <gdextension_interface.h>
@@ -16,10 +15,6 @@ static void initialize_steam_spatial(ModuleInitializationLevel level) {
 	ClassDB::register_class<AudioEffectSteamDirectInstance>();
 	ClassDB::register_class<AudioEffectSteamSpatial>();
 	ClassDB::register_class<AudioEffectSteamSpatialInstance>();
-	ClassDB::register_class<AudioEffectSteamReflectionHRTF>();
-	ClassDB::register_class<AudioEffectSteamReflectionHRTFInstance>();
-	ClassDB::register_class<AudioEffectSteamReflectionSend>();
-	ClassDB::register_class<AudioEffectSteamReflectionSendInstance>();
 }
 
 static void uninitialize_steam_spatial(ModuleInitializationLevel level) {}

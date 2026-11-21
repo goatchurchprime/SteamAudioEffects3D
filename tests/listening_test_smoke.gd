@@ -18,14 +18,6 @@ func _run() -> void:
 	assert(listener.is_current(), "Listening test must make its explicit listener current")
 	assert(native_player.stream != null and native_player.stream == quality_player.stream,
 			"Both renderers must receive the identical audition stream")
-	assert(not quality_player.reflections_enabled, "The default localization trial must begin dry")
-
-	quality_player.apply_reflection_preset(AudioStreamQPlayer3D.ReflectionPreset.LARGE_HALL)
-	await physics_frame
-	assert(quality_player.reflections_enabled)
-	assert(quality_player.reflection_reverb_times == Vector3(2.2, 1.8, 1.3))
-	assert(quality_player.steam_reflection_send.enabled)
-	assert(quality_player.steam_reflection_send.reverb_times == Vector3(2.2, 1.8, 1.3))
 
 	var source_position_before_listener_turn := source_rig.position
 	var listener_yaw_before := listener.rotation_degrees.y
@@ -46,8 +38,6 @@ func _run() -> void:
 	await process_frame
 	assert(native_player.is_playing() and not quality_player.is_playing(),
 			"Backend switching must remain exclusive")
-	assert(not quality_player.reflections_enabled,
-			"The inactive QPlayer must not leave a reflection tail under native output")
 
 	demo.call("_stop_players")
 	native_player.stream = null

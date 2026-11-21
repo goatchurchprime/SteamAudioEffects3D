@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 steam_root="${STEAM_AUDIO_ROOT:-${repo_dir}/build/steam-audio/install}"
-output_dir="${1:-${repo_dir}/addons/steam_spatial/reference_energy_fields}"
+output_dir="${1:-${repo_dir}/experiments/reflections/reference_energy_fields}"
 quality="${2:-full}"
 tool_dir="${repo_dir}/build/tools"
 tool="${tool_dir}/bake_reference_energy_fields"

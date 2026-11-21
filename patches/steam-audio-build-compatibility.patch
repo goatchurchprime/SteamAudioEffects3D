@@ -1,0 +1,73 @@
+diff --git a/build/get_dependencies.py b/build/get_dependencies.py
+index 43ba621..417f875 100644
+--- a/build/get_dependencies.py
++++ b/build/get_dependencies.py
+@@ -491,6 +491,14 @@ def configure_cmake(name, cmake_layers, platform, cmake, vs_version, ndk_path,
+     make_dir(install_dir)
+ 
+     cmake_args = []
++    # Steam Audio pins some dependency revisions whose cmake_minimum_required
++    # predates CMake 3.5. CMake 4 can still build them when the policy floor is
++    # stated explicitly.
++    cmake_args += ['-DCMAKE_POLICY_VERSION_MINIMUM=3.5']
++    if platform.startswith('linux-'):
++        # Old FlatBuffers treats warnings as errors and GCC 16 diagnoses one
++        # additional unused variable in its code generator.
++        cmake_args += ['-DCMAKE_CXX_FLAGS=-Wno-error=unused-but-set-variable']
+ 
+     if platform == 'windows-x86':
+         cmake_args += ['-G', vs_generator_name(vs_version), '-A', 'Win32']
+diff --git a/build/FindPFFFT.cmake b/build/FindPFFFT.cmake
+--- a/build/FindPFFFT.cmake
++++ b/build/FindPFFFT.cmake
+@@ -20,13 +20,16 @@ find_path(PFFFT_INCLUDE_DIR
+ 	NAMES 			pffft.h
+ 	PATHS 			${CMAKE_HOME_DIRECTORY}/deps/pffft/include
++	NO_DEFAULT_PATH
+ )
+ 
+ find_library(PFFFT_LIBRARY
+ 	NAMES pffft
+ 	PATHS ${CMAKE_HOME_DIRECTORY}/deps/pffft/lib/${IPL_BIN_SUBDIR}/release
++	NO_DEFAULT_PATH
+ )
+ 
+ find_library(PFFFT_LIBRARY_DEBUG
+ 	NAMES pffft
+ 	PATHS ${CMAKE_HOME_DIRECTORY}/deps/pffft/lib/${IPL_BIN_SUBDIR}/debug
++	NO_DEFAULT_PATH
+ )
+diff --git a/build/FindMySOFA.cmake b/build/FindMySOFA.cmake
+--- a/build/FindMySOFA.cmake
++++ b/build/FindMySOFA.cmake
+@@ -24,13 +24,16 @@ find_path(MySOFA_INCLUDE_DIR
+ 	NAMES 			mysofa.h
+ 	PATHS 			${CMAKE_HOME_DIRECTORY}/deps/mysofa/include
++	NO_DEFAULT_PATH
+ )
+ 
+ find_library(MySOFA_LIBRARY
+ 	NAMES mysofa
+ 	PATHS ${CMAKE_HOME_DIRECTORY}/deps/mysofa/lib/${IPL_BIN_SUBDIR}/release
++	NO_DEFAULT_PATH
+ )
+ 
+ find_library(MySOFA_LIBRARY_DEBUG
+ 	NAMES mysofa
+ 	PATHS ${CMAKE_HOME_DIRECTORY}/deps/mysofa/lib/${IPL_BIN_SUBDIR}/debug
++	NO_DEFAULT_PATH
+ )
+diff --git a/build/FindFlatBuffers.cmake b/build/FindFlatBuffers.cmake
+--- a/build/FindFlatBuffers.cmake
++++ b/build/FindFlatBuffers.cmake
+@@ -19,9 +19,11 @@ find_path(FlatBuffers_INCLUDE_DIR
+ 	NAMES 			flatbuffers/flatbuffers.h
+ 	PATHS 			${CMAKE_HOME_DIRECTORY}/deps/flatbuffers/include
++	NO_DEFAULT_PATH
+ )
+ 
+ find_program(FlatBuffers_EXECUTABLE
+ 	NAMES	flatc
+ 	PATHS 	${CMAKE_HOME_DIRECTORY}/deps/flatbuffers/bin/${IPL_BIN_SUBDIR}
++	NO_DEFAULT_PATH
+ )

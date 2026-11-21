@@ -4,33 +4,41 @@
 		Spatializes a point source to stereo using Steam Audio's built-in HRTF.
 	</brief_description>
 	<description>
-		Converts a mono point source into binaural stereo based on its listener-relative [member direction]. The current implementation folds Godot's stereo bus input to mono before spatialization, applies [member gain], and uses Steam Audio's built-in HRTF.
-		This is a render effect only. It does not locate a Godot listener or source, trace geometry, calculate propagation delay, or render reflections and reverb. [AudioStreamQPlayer3D] updates its parameters from Godot transforms. It can also be driven directly by another source of spatial parameters.
+		Converts a mono point source into binaural stereo from global [member source_position], [member receiver_position], and [member receiver_orientation]. The effect derives Steam Audio's listener-local unit direction internally. The current implementation folds Godot's stereo bus input to mono before spatialization, applies [member gain], and uses Steam Audio's built-in HRTF.
+		This is a render effect only. It does not locate a Godot listener or source, trace geometry, calculate propagation delay, or render reflections and reverb. [AudioStreamQPlayer3D] updates its parameters from Godot transforms. Keeping the unnormalized global transforms at this interface leaves room for a later propagation-delay stage to deliver time-aligned source positions.
 		Place [AudioEffectSteamDirect] before this effect when direct-path filtering is required. Output is always a stereo binaural signal intended for headphones; it is not a loudspeaker-surround decoder.
 	</description>
 	<tutorials>
 		<link title="Steam Audio Binaural Effect">https://valvesoftware.github.io/steam-audio/doc/capi/binaural-effect.html</link>
 	</tutorials>
 	<methods>
-		<method name="set_source_parameters">
+		<method name="set_spatial_parameters">
 			<return type="void" />
-			<param index="0" name="direction" type="Vector3" />
-			<param index="1" name="gain" type="float" />
-			<param index="2" name="spatial_blend" type="float" default="1.0" />
+			<param index="0" name="source_position" type="Vector3" />
+			<param index="1" name="receiver_position" type="Vector3" />
+			<param index="2" name="receiver_orientation" type="Quaternion" />
+			<param index="3" name="gain" type="float" />
+			<param index="4" name="spatial_blend" type="float" default="1.0" />
 			<description>
-				Updates [member direction], [member gain], and [member spatial_blend] together. This reduces main-thread property traffic when a source moves.
+				Updates both global transforms, [member gain], and [member spatial_blend] as one coherent snapshot. This is the preferred real-time update method.
 			</description>
 		</method>
 	</methods>
 	<members>
-		<member name="direction" type="Vector3" setter="set_direction" getter="get_direction" default="Vector3(0, 0, -1)">
-			Unit vector in listener-local space pointing from the listener toward the source. Nonzero values are normalized automatically; a zero vector becomes [code]Vector3(0, 0, -1)[/code].
+		<member name="source_position" type="Vector3" setter="set_source_position" getter="get_source_position" default="Vector3(0, 0, -1)">
+			Source position in the same global coordinate frame as [member receiver_position]. Distance is retained for future delay integration but does not itself apply gain or propagation delay here.
+		</member>
+		<member name="receiver_position" type="Vector3" setter="set_receiver_position" getter="get_receiver_position" default="Vector3(0, 0, 0)">
+			Receiver or listener position in global coordinates.
+		</member>
+		<member name="receiver_orientation" type="Quaternion" setter="set_receiver_orientation" getter="get_receiver_orientation" default="Quaternion(0, 0, 0, 1)">
+			Global receiver orientation. Its inverse rotates the global source direction into the listener-local direction required by Steam Audio.
 		</member>
 		<member name="gain" type="float" setter="set_gain" getter="get_gain" default="1.0">
 			Nonnegative linear gain applied to the mono source immediately before HRTF rendering. This is an integration convenience and is not a field of Steam Audio's [code]IPLBinauralEffectParams[/code].
 		</member>
 		<member name="interpolation" type="int" setter="set_interpolation" getter="get_interpolation" enum="AudioEffectSteamSpatial.Interpolation" default="1">
-			HRTF measurement interpolation used when [member direction] falls between measured locations.
+			HRTF measurement interpolation used when the derived listener-local direction falls between measured locations.
 		</member>
 		<member name="spatial_blend" type="float" setter="set_spatial_blend" getter="get_spatial_blend" default="1.0">
 			Blend between unspatialized mono and fully HRTF-spatialized output, clamped to [code]0.0[/code]–[code]1.0[/code]. Because this implementation first folds input to mono, [code]0.0[/code] does not preserve the original stereo image.

@@ -8,7 +8,7 @@ at one listener probe for a static source.
 Run a quick, low-ray-count bake while developing:
 
 ```sh
-scripts/bake_reference_energy_fields.sh addons/steam_spatial/reference_energy_fields quick
+scripts/bake_reference_energy_fields.sh experiments/reflections/reference_energy_fields quick
 ```
 
 Run the slower reference bake with the Steam documentation's offline-quality
@@ -22,9 +22,11 @@ Each JSON file contains the exact flattened layout accepted by
 `AudioEffectSteamReflectionSend.energy_field`: Ambisonic channel, frequency
 band, then 10 ms time bin. The files also include the RT60 values Steam derives
 from the same simulation. They are diagnostic fixtures, not runtime assets or
-an API commitment. The checked-in copies under the addon are used by its
-audition presets; rerunning this tool replaces them with newly simulated data.
+an API commitment. The checked-in copies live under
+`experiments/reflections/`; they are excluded from the direct-only addon.
+Rerunning this tool replaces them with newly simulated data.
 
 All checked-in fields remain in the fixed world-space orientation produced by
-Steam Audio. Listener orientation is applied later by Steam's Ambisonic HRTF
-decoder; the addon does not animate or artistically rotate the field.
+Steam Audio. In the deferred reflection experiment, listener orientation is
+applied later by Steam's Ambisonic HRTF decoder; no artistic field rotation is
+applied.

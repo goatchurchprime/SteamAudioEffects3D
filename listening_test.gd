@@ -6,32 +6,6 @@ extends Node3D
 enum Backend { QUALITY_HRTF, NATIVE_GODOT }
 enum TestSignal { VOICE_LIKE, FOOTSTEPS, PINK_NOISE, SIREN, PURE_TONE }
 
-const PRESET_VALUES := [
-	AudioStreamQPlayer3D.ReflectionPreset.OFF,
-	AudioStreamQPlayer3D.ReflectionPreset.DEAD_BOOTH,
-	AudioStreamQPlayer3D.ReflectionPreset.FURNISHED_ROOM,
-	AudioStreamQPlayer3D.ReflectionPreset.OFFICE,
-	AudioStreamQPlayer3D.ReflectionPreset.LARGE_HALL,
-	AudioStreamQPlayer3D.ReflectionPreset.STONE_TUNNEL,
-	AudioStreamQPlayer3D.ReflectionPreset.EXAGGERATED_CAVERN,
-	AudioStreamQPlayer3D.ReflectionPreset.ABSORBENT_WALL,
-	AudioStreamQPlayer3D.ReflectionPreset.SMALL_SHOEBOX,
-	AudioStreamQPlayer3D.ReflectionPreset.FAR_WALL_ECHO,
-	AudioStreamQPlayer3D.ReflectionPreset.BIG_AUDITORIUM,
-]
-const PRESET_NAMES := [
-	"Off",
-	"Steam parametric (omnidirectional): dead booth",
-	"Steam parametric (omnidirectional): furnished room",
-	"Steam parametric (omnidirectional): office",
-	"Steam parametric (omnidirectional): large hall",
-	"Steam parametric (omnidirectional): stone tunnel",
-	"Steam parametric (omnidirectional): exaggerated cavern",
-	"Steam bake: absorbent wall",
-	"Steam bake: small shoebox",
-	"Steam bake: far-wall echo",
-	"Steam bake: big auditorium",
-]
 const SIGNAL_NAMES := ["Voice-like", "Footsteps", "Pink noise", "Siren", "Pure tone"]
 const SOURCE_AZIMUTHS := [-150.0, -120.0, -90.0, -60.0, -30.0, 0.0, 30.0, 60.0, 90.0, 120.0, 150.0, 180.0]
 const SOURCE_ELEVATIONS := [-25.0, 0.0, 25.0]
@@ -60,14 +34,12 @@ const LISTENER_YAWS := [-150.0, -120.0, -90.0, -60.0, -30.0, 0.0, 30.0, 60.0, 90
 @onready var help_label: Label = $UI/Margin/VBox/Help
 @onready var backend_button: Button = $UI/Margin/VBox/Controls/Backend
 @onready var signal_button: Button = $UI/Margin/VBox/Controls/Signal
-@onready var preset_button: Button = $UI/Margin/VBox/Controls/Preset
 @onready var play_button: Button = $UI/Margin/VBox/Actions/Play
 @onready var random_button: Button = $UI/Margin/VBox/Actions/Randomize
 @onready var reveal_button: Button = $UI/Margin/VBox/Actions/Reveal
 
 var backend := Backend.QUALITY_HRTF
 var test_signal := TestSignal.VOICE_LIKE
-var preset_index := 0
 var source_azimuth_degrees := 60.0
 var source_elevation_degrees := 0.0
 var source_distance_metres := 4.0
@@ -89,13 +61,11 @@ func _ready() -> void:
 		footstep_stream = _make_footstep_stream()
 	backend_button.pressed.connect(_cycle_backend)
 	signal_button.pressed.connect(_cycle_signal)
-	preset_button.pressed.connect(_cycle_preset)
 	play_button.pressed.connect(_toggle_playback)
 	random_button.pressed.connect(_randomize_hidden_source)
 	reveal_button.pressed.connect(_reveal_and_score)
 	footstep_timer.timeout.connect(_play_footstep)
 	_set_source_angles(source_azimuth_degrees, source_elevation_degrees)
-	_apply_preset()
 	_apply_signal()
 	_update_interface()
 
@@ -109,12 +79,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_cycle_backend()
 		KEY_S:
 			_cycle_signal()
-		KEY_P:
-			_cycle_preset()
-		KEY_D:
-			quality_player.direct_path_enabled = not quality_player.direct_path_enabled
-			quality_player._update_spatialization()
-			_update_interface()
 		KEY_R:
 			if event.shift_pressed:
 				_randomize_listener_yaw()
@@ -147,11 +111,6 @@ func _cycle_signal() -> void:
 	_apply_signal()
 	if was_playing:
 		_start_players()
-	_update_interface()
-
-func _cycle_preset() -> void:
-	preset_index = (preset_index + 1) % PRESET_VALUES.size()
-	_prepare_backend()
 	_update_interface()
 
 func _toggle_playback() -> void:
@@ -199,17 +158,8 @@ func _apply_signal() -> void:
 	native_player.stream = selected_stream
 	quality_player.stream = selected_stream
 
-func _apply_preset() -> void:
-	quality_player.apply_reflection_preset(PRESET_VALUES[preset_index])
-
 func _prepare_backend() -> void:
-	if backend == Backend.QUALITY_HRTF:
-		_apply_preset()
-	else:
-		# Do not leave a long QPlayer tail underneath the native A/B side.
-		quality_player.reflections_enabled = false
-		if quality_player.steam_reflection_send != null:
-			quality_player.steam_reflection_send.set("enabled", false)
+	quality_player._update_spatialization()
 
 func _randomize_hidden_source() -> void:
 	var old_azimuth := source_azimuth_degrees
@@ -273,7 +223,6 @@ func _update_interface() -> void:
 		return
 	backend_button.text = "Backend: %s" % ("QPlayer HRTF" if backend == Backend.QUALITY_HRTF else "Godot native")
 	signal_button.text = "Signal: %s" % SIGNAL_NAMES[test_signal]
-	preset_button.text = "Reflection preset: %s" % PRESET_NAMES[preset_index]
 	play_button.text = "Stop" if audition_playing else "Play"
 	reveal_button.text = "Reveal + score" if source_hidden else "Hide source"
 	var location := "hidden" if source_hidden else "azimuth %.0f°, elevation %.0f°" % [source_azimuth_degrees, source_elevation_degrees]
@@ -281,15 +230,14 @@ func _update_interface() -> void:
 	var score := ""
 	if last_pointing_error_degrees >= 0.0:
 		score = " | pointing error %.1f°" % last_pointing_error_degrees
-	status_label.text = "%s | %s | %s | listener yaw %.0f° | direct %s%s" % [
+	status_label.text = "%s | %s | %s | listener yaw %.0f°%s" % [
 		"playing" if audition_playing else "stopped",
 		"QPlayer HRTF" if backend == Backend.QUALITY_HRTF else "Godot native",
 		location,
 		listener_yaw,
-		"on" if quality_player.direct_path_enabled else "off (wet only)",
 		score,
 	]
-	help_label.text = "Headphones recommended. Space play · B backend · S signal · P preset · D direct/wet-only · R random direct source · Shift+R random listener yaw/field decode · Left/Right turn listener · Up/Down source elevation · H reveal/score"
+	help_label.text = "Headphones recommended. Space play · B backend · S signal · R random source · Shift+R random listener yaw · Left/Right turn listener · Up/Down source elevation · H reveal/score"
 
 func _make_voice_like_stream() -> AudioStreamWAV:
 	const SAMPLE_RATE := 48000
