@@ -2,7 +2,7 @@ diff --git a/build/get_dependencies.py b/build/get_dependencies.py
 index 43ba621..417f875 100644
 --- a/build/get_dependencies.py
 +++ b/build/get_dependencies.py
-@@ -491,6 +491,14 @@ def configure_cmake(name, cmake_layers, platform, cmake, vs_version, ndk_path,
+@@ -491,6 +491,18 @@ def configure_cmake(name, cmake_layers, platform, cmake, vs_version, ndk_path,
      make_dir(install_dir)
  
      cmake_args = []
@@ -10,6 +10,10 @@ index 43ba621..417f875 100644
 +    # predates CMake 3.5. CMake 4 can still build them when the policy floor is
 +    # stated explicitly.
 +    cmake_args += ['-DCMAKE_POLICY_VERSION_MINIMUM=3.5']
++    if platform.startswith('windows-'):
++        # Ensure old dependency projects honor CMAKE_MSVC_RUNTIME_LIBRARY.
++        # Otherwise libmysofa silently uses /MD while Steam Audio uses /MT.
++        cmake_args += ['-DCMAKE_POLICY_DEFAULT_CMP0091=NEW']
 +    if platform.startswith('linux-'):
 +        # Old FlatBuffers treats warnings as errors and GCC 16 diagnoses one
 +        # additional unused variable in its code generator.
@@ -57,10 +61,10 @@ diff --git a/build/FindMySOFA.cmake b/build/FindMySOFA.cmake
  	PATHS ${CMAKE_HOME_DIRECTORY}/deps/mysofa/lib/${IPL_BIN_SUBDIR}/debug
 +	NO_DEFAULT_PATH
  )
-diff --git a/build/FindFlatBuffers.cmake b/build/FindFlatBuffers.cmake
+ diff --git a/build/FindFlatBuffers.cmake b/build/FindFlatBuffers.cmake
 --- a/build/FindFlatBuffers.cmake
 +++ b/build/FindFlatBuffers.cmake
-@@ -19,9 +19,11 @@ find_path(FlatBuffers_INCLUDE_DIR
+@@ -19,8 +19,10 @@ find_path(FlatBuffers_INCLUDE_DIR
  	NAMES 			flatbuffers/flatbuffers.h
  	PATHS 			${CMAKE_HOME_DIRECTORY}/deps/flatbuffers/include
 +	NO_DEFAULT_PATH
@@ -71,3 +75,18 @@ diff --git a/build/FindFlatBuffers.cmake b/build/FindFlatBuffers.cmake
  	PATHS 	${CMAKE_HOME_DIRECTORY}/deps/flatbuffers/bin/${IPL_BIN_SUBDIR}
 +	NO_DEFAULT_PATH
  )
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0f8fe97..37b3dbf 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -163,7 +163,10 @@ if (IPL_OS_LINUX)
+         add_compile_options(-m32 -mfpmath=sse -march=native)
+     endif()
+     if (STEAMAUDIO_ENABLE_AVX)
+-        add_compile_options(-fabi-version=6)
++        # The public library boundary is C. Forcing GCC's obsolete C++ ABI v6
++        # breaks libstdc++ <future> on GCC 11, including Ubuntu 22.04 CI, and
++        # provides no compatibility benefit to API consumers.
++        # add_compile_options(-fabi-version=6)
+     endif()
+ endif()

@@ -42,6 +42,12 @@ case "$platform:$arch" in
             echo "ANDROID_NDK or ANDROID_NDK_ROOT must identify Android NDK r25c" >&2
             exit 1
         fi
+        if command -v cygpath >/dev/null 2>&1; then
+            # CMake persists this value in generated source using backslashes as
+            # escapes. Use a Windows path with forward slashes instead.
+            ANDROID_NDK="$(cygpath -m "$ANDROID_NDK")"
+            export ANDROID_NDK ANDROID_NDK_ROOT="$ANDROID_NDK"
+        fi
         ;;
     *)
         echo "Unsupported source target: $platform:$arch" >&2
